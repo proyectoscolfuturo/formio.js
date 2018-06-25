@@ -1,4 +1,9 @@
-export default {
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var component = exports.component = {
   'input': true,
   'tableView': true,
   'label': 'Location',
@@ -13,20 +18,19 @@ export default {
     'gmapId': '',
     'region': '',
     'key': '',
-    'autocompleteOptions' : {
-      'componentRestrictions' : {
-        'country' : [
-          ''
-        ]
-      }
+    'gmapTypes': '',
+    'autocompleteOptions': {
+      'componentRestrictions': {
+        'country': ['']
+      },
+      'types': []
     }
   },
   'validate': {
     'required': false
   },
   'type': 'location',
-  'tags': [
-  ],
+  'tags': [],
   'conditional': {
     'show': '',
     'when': null,
