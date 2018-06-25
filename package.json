@@ -1,6 +1,6 @@
 {
-  "name": "formiojs",
-  "version": "3.0.0-rc.12",
+  "name": "formiojs-proyectoscolfuturo",
+  "version": "1.0.1",
   "description": "Common js library for client side interaction with <form.io>",
   "main": "index.js",
   "files": [
@@ -27,7 +27,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/formio/formio.js.git"
+    "url": "git+https://github.com/proyectoscolfuturo/formio.js.git"
   },
   "contributors": [
     {
