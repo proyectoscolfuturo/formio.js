@@ -84,11 +84,12 @@ export default class LocationComponent extends BaseComponent {
           var types = [];
           autocompleteOptions = that.component.map.autocompleteOptions || {};
 
-          if (that.component.map.gmapTypes != null && that.component.map.gmapTypes != 'address') {
-            types.push("" + that.component.map.gmapTypes);
+          if (that.component.map.gmapTypes != null && that.component.map.gmapTypes !== 'address') {
+            //types.push("" + that.component.map.gmapTypes);
+			types.push(`${that.component.map.gmapTypes}`);
             autocompleteOptions.types = types;
           }
-          else if (that.component.map.gmapTypes == 'address') {
+          else if (that.component.map.gmapTypes === 'address') {
             types = [];
             autocompleteOptions.types = types;
           }
