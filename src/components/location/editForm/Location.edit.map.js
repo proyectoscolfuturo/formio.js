@@ -39,5 +39,4 @@ exports.default = [{
   data: {
     values: [{ label: 'cities', value: '(cities)' }, { label: 'address', value: 'address' }]
   }
-}
-];
+}];

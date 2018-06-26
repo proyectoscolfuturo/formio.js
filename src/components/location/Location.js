@@ -1,6 +1,6 @@
 'use strict';
 
-Object.defineProperty(exports, '__esModule', {
+Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
@@ -11,6 +11,10 @@ var _createClass = function () { function defineProperties(target, props) { for 
 var _Base = require('../base/Base');
 
 var _Base2 = _interopRequireDefault(_Base);
+
+var _Formio = require('../../Formio');
+
+var _Formio2 = _interopRequireDefault(_Formio);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -39,7 +43,6 @@ var LocationComponent = function (_BaseComponent) {
           key: '',
           region: '',
           gmapId: '',
-          gmapTypes: '',
           autocompleteOptions: {}
         }
       }].concat(extend));
@@ -71,7 +74,7 @@ var LocationComponent = function (_BaseComponent) {
       src += '&region=' + component.map.region;
     }
 
-    _Base2.default.requireLibrary('googleMaps', 'google.maps.places', src);
+    _Formio2.default.requireLibrary('googleMaps', 'google.maps.places', src);
     return _this;
   }
 
@@ -90,12 +93,12 @@ var LocationComponent = function (_BaseComponent) {
       this.input = this.createInput(this.element);
       this.addInput(this.input, this.element);
 
- /*      var gmapElement = this.ce('div', {
+  /*      var gmapElement = this.ce('div', {
         id: this.component.map.gmapId,
         style: 'min-height: 300px; height: calc(100vh - 600px);'
       });
       this.element.appendChild(gmapElement); */
-    }
+    } 
   }, {
     key: 'setValue',
     value: function setValue(value, flags) {
@@ -110,24 +113,23 @@ var LocationComponent = function (_BaseComponent) {
 
       _get(LocationComponent.prototype.__proto__ || Object.getPrototypeOf(LocationComponent.prototype), 'addInput', this).call(this, input, container);
       var that = this;
-      _Base2.default.libraryReady('googleMaps').then(function () {
+      _Formio2.default.libraryReady('googleMaps').then(function () {
         var autocompleteOptions = {};
 
         if (_this2.component.map) {
-          var objetoFinal = [];
+          var types = [];
           autocompleteOptions = _this2.component.map.autocompleteOptions || {};
 
           if (_this2.component.map.gmapTypes != null && _this2.component.map.gmapTypes != 'address') {
-            objetoFinal.push("" + _this2.component.map.gmapTypes);
-            autocompleteOptions.types = objetoFinal;
+            types.push("" + _this2.component.map.gmapTypes);
+            autocompleteOptions.types = types;
           }
           else if (_this2.component.map.gmapTypes == 'address'){
-            objetoFinal = [];
-            autocompleteOptions.types = objetoFinal;
+            types = [];
+            autocompleteOptions.types = types;
           }
         }
-        console.log(_this2.component.map);
-
+        
         var autocomplete = new google.maps.places.Autocomplete(input, autocompleteOptions);
         autocomplete.addListener('place_changed', function () {
           that.marker.setVisible(false);
@@ -169,7 +171,7 @@ var LocationComponent = function (_BaseComponent) {
     value: function initGoogleMap() {
       var _this3 = this;
 
-      _Base2.default.libraryReady('googleMaps').then(function () {
+      _Formio2.default.libraryReady('googleMaps').then(function () {
         var defaultLatlng = new google.maps.LatLng(45.5041482, -73.5574125);
         var options = {
           zoom: 19,
