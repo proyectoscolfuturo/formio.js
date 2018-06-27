@@ -12,6 +12,7 @@ require('./components/builder');
 
 export default class WebformBuilder extends Webform {
   constructor(element, options) {
+    self = this;
     super(element, options);
     this.dragContainers = [];
     this.sidebarContainers = [];
@@ -67,12 +68,12 @@ export default class WebformBuilder extends Webform {
         const removeButton = parent.ce('div', {
           class: 'btn btn-xxs btn-danger component-settings-button component-settings-button-remove'
         }, parent.getIcon('remove'));
-        parent.addEventListener(removeButton, 'click', () => parent.deleteComponent(comp));
+        parent.addEventListener(removeButton, 'click', () => self.deleteComponent(comp));
 
         const editButton = parent.ce('div', {
           class: 'btn btn-xxs btn-default component-settings-button component-settings-button-edit'
         }, parent.getIcon('cog'));
-        parent.addEventListener(editButton, 'click', () => parent.editComponent(comp));
+        parent.addEventListener(editButton, 'click', () => self.editComponent(comp));
 
         // Add the edit buttons to the component.
         comp.prepend(parent.ce('div', {
