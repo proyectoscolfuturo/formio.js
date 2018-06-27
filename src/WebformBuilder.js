@@ -12,8 +12,8 @@ require('./components/builder');
 
 export default class WebformBuilder extends Webform {
   constructor(element, options) {
-    self = this;
     super(element, options);
+    const self = this;
     this.dragContainers = [];
     this.sidebarContainers = [];
     this.updateDraggable = _.debounce(this.refreshDraggable.bind(this), 200);
