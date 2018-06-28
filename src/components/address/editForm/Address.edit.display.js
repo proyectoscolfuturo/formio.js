@@ -21,7 +21,7 @@ export default [
         tooltip: "The API key for Google Maps. See <a href='https://developers.google.com/maps/documentation/geocoding/get-api-key' target='_blank'>Get an API Key</a> for more information.",
         placeholder: 'xxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxx'
       },
-      {
+     /*  {
         type: 'select',
         input: true,
         label: 'Autocomplete types',
@@ -33,7 +33,7 @@ export default [
         data: {
           values: [{ label: 'cities', value: '(cities)' }, { label: 'address', value: 'address' }]
         }
-      }
+      } */
     ]
   }
 ];
