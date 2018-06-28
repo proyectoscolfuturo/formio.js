@@ -36,6 +36,13 @@ export default [
         input: true
       }
     ]
+  }, {
+    weight: 413,
+    type: 'checkbox',
+    input: true,
+    defaultValue: true,
+    key: 'showDataGrid',
+    label: 'Show in Grid columns'
   },
   {
     weight: 420,
