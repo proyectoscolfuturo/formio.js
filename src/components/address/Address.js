@@ -477,7 +477,7 @@ export default class AddressComponent extends TextFieldComponent {
         this.autoCompleteInit(input, autoCompleteOptions);
       }
       else {
-        const autocomplete = new google.maps.places.Autocomplete(input);
+        const autocomplete = new google.maps.places.Autocomplete(input, autoCompleteOptions);
         autocomplete.addListener('place_changed', () => this.setValue(autocomplete.getPlace()));
       }
     });
