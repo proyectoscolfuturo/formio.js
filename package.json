@@ -1,6 +1,6 @@
 {
   "name": "formiojs-proyectoscolfuturo",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Common js library for client side interaction with <form.io>",
   "main": "index.js",
   "files": [
