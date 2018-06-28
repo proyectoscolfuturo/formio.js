@@ -20,6 +20,19 @@ export default [
         key: 'key',
         tooltip: "The API key for Google Maps. See <a href='https://developers.google.com/maps/documentation/geocoding/get-api-key' target='_blank'>Get an API Key</a> for more information.",
         placeholder: 'xxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxx'
+      },
+      {
+        type: 'select',
+        input: true,
+        label: 'Autocomplete types',
+        key: 'map.gmapTypes',
+        tooltip: 'This is the Google Maps types you wish to use to autocomplete data.',
+        weight: 20,
+        defaultValue: 'address',
+        dataSrc: 'values',
+        data: {
+          values: [{ label: 'cities', value: '(cities)' }, { label: 'address', value: 'address' }]
+        }
       }
     ]
   }

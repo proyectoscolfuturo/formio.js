@@ -12,7 +12,15 @@ export default {
   'map': {
     'region': '',
     'key': '',
-    'autocompleteOptions': null,
+    'gmapTypes': '',
+    'autocompleteOptions' : {
+      'componentRestrictions' : {
+        'country' : [
+          ''
+        ]
+      },
+      'types': []
+    },
     'autocompleteFilter': null
   },
   'validate': {

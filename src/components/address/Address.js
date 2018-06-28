@@ -470,6 +470,8 @@ export default class AddressComponent extends TextFieldComponent {
         }
       }
 
+      autoCompleteOptions.types = ['(cities)'];
+
       if (this.component.map && this.component.map.autoCompleteFilter) {
         // Call custom autoComplete to filter suggestions
         this.autoCompleteInit(input, autoCompleteOptions);
