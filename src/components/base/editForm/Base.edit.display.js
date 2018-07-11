@@ -211,6 +211,14 @@ export default [
     tooltip: 'Shows this value within the table view of the submissions.',
     key: 'tableView',
     input: true
+  }, {
+    weight: 1600,
+    type: 'checkbox',
+    label: 'FrontOffice',
+    tooltip: 'Shows this value within the table view of the submissions.',
+    key: 'frontOffice',
+    input: true,
+    defaultValue: true,
   }
 ];
 /* eslint-enable max-len */
