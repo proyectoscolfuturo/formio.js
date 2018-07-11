@@ -121,6 +121,13 @@ export default [
     label: 'Error Label',
     placeholder: 'Error Label',
     tooltip: 'The label for this field when an error occurs.'
+  },{
+    weight: 401,
+    type: 'checkbox',
+    input: true,
+    defaultValue: true,
+    key: 'showDataGrid',
+    label: 'Show in Grid columns'
   },
   {
     weight: 500,
