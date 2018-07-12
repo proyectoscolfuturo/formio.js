@@ -399,18 +399,25 @@ export default class NestedComponent extends BaseComponent {
   }
 
   setHidden(component) {
+    // if (component.options.frontOffice) { // es frontoffice
+    //   if (component.component.frontOffice === true  ) {
+    //     component.component.hidden = false;
+    //   }
+    //   else {
+    //     component.component.hidden = true;
+    //   }
+    // }
+    // else{ // es backoffice
+
+    // }
+    if (component.options.frontOffice && component.component.frontOffice === false) {
+      component.component.hidden = true;
+    }
+
     if (component.components && component.components.length) {
       component.hideComponents(this.hidden);
     }
-    else if (component.options && component.options.frontOffice) {
-      if (component.component.frontOffice === false || component.component.hidden) {
-        console.log(component.visible);
-        component.visible = false;
-        console.log(component.visible);
-      }
-    }
     else if (component.component.hidden) {
-      //console.log(component.visible);
       component.visible = false;
     }
     else {
