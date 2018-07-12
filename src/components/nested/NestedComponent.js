@@ -399,17 +399,7 @@ export default class NestedComponent extends BaseComponent {
   }
 
   setHidden(component) {
-    // if (component.options.frontOffice) { // es frontoffice
-    //   if (component.component.frontOffice === true  ) {
-    //     component.component.hidden = false;
-    //   }
-    //   else {
-    //     component.component.hidden = true;
-    //   }
-    // }
-    // else{ // es backoffice
-
-    // }
+    // colfuturo changes.
     if (component.options.frontOffice && component.component.frontOffice === false) {
       component.component.hidden = true;
     }
