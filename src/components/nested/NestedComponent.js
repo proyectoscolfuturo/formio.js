@@ -402,7 +402,15 @@ export default class NestedComponent extends BaseComponent {
     if (component.components && component.components.length) {
       component.hideComponents(this.hidden);
     }
+    else if (component.options && component.options.frontOffice) {
+      if (component.component.frontOffice === false || component.component.hidden) {
+        console.log(component.visible);
+        component.visible = false;
+        console.log(component.visible);
+      }
+    }
     else if (component.component.hidden) {
+      //console.log(component.visible);
       component.visible = false;
     }
     else {
