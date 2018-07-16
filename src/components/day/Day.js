@@ -416,20 +416,27 @@ export default class DayComponent extends BaseComponent {
    * @returns {Date}
    */
   get date() {
-    const day = !this.dayInput || _.isNaN(this.dayInput.value) ? 0 : parseInt(this.dayInput.value, 10);
-    const month = !this.monthInput || _.isNaN(this.monthInput.value) ? -1 : (parseInt(this.monthInput.value, 10) - 1);
-    const year = !this.yearInput || _.isNaN(this.yearInput.value) ? 0 : parseInt(this.yearInput.value, 10);
+    var day = !this.dayInput || _.isNaN(this.dayInput.value) ? 0 : parseInt(this.dayInput.value, 10);
+    var month = !this.monthInput || _.isNaN(this.monthInput.value) ? -1 : (parseInt(this.monthInput.value, 10) - 1);
+    var year = !this.yearInput || _.isNaN(this.yearInput.value) ? 0 : parseInt(this.yearInput.value, 10);
+
     if (this.showDay && !day) {
-      // Invalid so return null
       return null;
+    }
+    else if (!this.showDay) {
+      day = 1;
     }
     if (this.showMonth && (month < 0)) {
-      // Invalid so return null
       return null;
     }
+    else if (!this.showMonth) {
+      month = 0;
+    }
     if (this.showYear && !year) {
-      // Invalid so return null
       return null;
+    }
+    else if (!this.showYear) {
+      year = 1900;
     }
     return moment([year, month, day]);
   }
