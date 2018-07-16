@@ -39,7 +39,11 @@ export default [
         key: 'value',
         input: true,
         type: 'textfield',
-        calculateValue: { _camelCase: [{ var: 'row.label' }] }
+        //calculateValue: { _camelCase: [{ var: 'row.label' }] }
+        // Colfuturo change
+        // start
+        calculateValue: { var: 'row.label' }
+        // end
       },
       {
         type: 'select',

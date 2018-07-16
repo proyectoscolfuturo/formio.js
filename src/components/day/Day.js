@@ -416,9 +416,9 @@ export default class DayComponent extends BaseComponent {
    * @returns {Date}
    */
   get date() {
-    const day = _.isNaN(this.dayInput.value) ? 0 : parseInt(this.dayInput.value, 10);
-    const month = _.isNaN(this.monthInput.value) ? -1 : (parseInt(this.monthInput.value, 10) - 1);
-    const year = _.isNaN(this.yearInput.value) ? 0 : parseInt(this.yearInput.value, 10);
+    const day = !this.dayInput || _.isNaN(this.dayInput.value) ? 0 : parseInt(this.dayInput.value, 10);
+    const month = !this.monthInput || _.isNaN(this.monthInput.value) ? -1 : (parseInt(this.monthInput.value, 10) - 1);
+    const year = !this.yearInput || _.isNaN(this.yearInput.value) ? 0 : parseInt(this.yearInput.value, 10);
     if (this.showDay && !day) {
       // Invalid so return null
       return null;
