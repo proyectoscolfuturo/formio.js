@@ -416,6 +416,12 @@ export default class DayComponent extends BaseComponent {
    * @returns {Date}
    */
   get date() {
+    if (!this.dayInput && !this.monthInput && !this.yearInput) {
+      if (typeof (this.data) === 'string' && this.data.length > 0) {
+        return moment(this.data, this.format);
+      }
+    }
+
     var day = !this.dayInput || _.isNaN(this.dayInput.value) ? 0 : parseInt(this.dayInput.value, 10);
     var month = !this.monthInput || _.isNaN(this.monthInput.value) ? -1 : (parseInt(this.monthInput.value, 10) - 1);
     var year = !this.yearInput || _.isNaN(this.yearInput.value) ? 0 : parseInt(this.yearInput.value, 10);
