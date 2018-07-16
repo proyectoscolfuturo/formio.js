@@ -399,6 +399,11 @@ export default class NestedComponent extends BaseComponent {
   }
 
   setHidden(component) {
+    // colfuturo changes.
+    if (component.options.frontOffice && component.component.frontOffice === false) {
+      component.component.hidden = true;
+    }
+
     if (component.components && component.components.length) {
       component.hideComponents(this.hidden);
     }
