@@ -42,7 +42,7 @@ export default [
         //calculateValue: { _camelCase: [{ var: 'row.label' }] }
         // Colfuturo change
         // start
-        calculateValue: { var: 'row.label' }
+        calculateValue: { var: 'row.label' },
         // end
 
         allowCalculateOverride: true,

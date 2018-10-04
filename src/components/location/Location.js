@@ -64,7 +64,6 @@ export default class LocationComponent extends BaseComponent {
       style: 'min-height: 300px; height: calc(100vh - 600px);'
     });
     this.element.appendChild(gmapElement); */
-  
     this.attachLogic();
   }
 

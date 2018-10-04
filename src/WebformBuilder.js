@@ -13,7 +13,7 @@ export default class WebformBuilder extends Webform {
   constructor(element, options) {
     super(element, options);
 
-    const self = this;
+    //const self = this;
     this.builderHeight = 0;
     this.dragContainers = [];
     this.sidebarContainers = [];
