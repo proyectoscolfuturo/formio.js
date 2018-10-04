@@ -65,7 +65,7 @@ export default class LocationComponent extends BaseComponent {
     });
     this.element.appendChild(gmapElement); */
   
-    // this.attachLogic();
+    this.attachLogic();
   }
 
   setValue(value, flags) {
