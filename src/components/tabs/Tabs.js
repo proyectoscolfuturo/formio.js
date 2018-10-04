@@ -97,7 +97,7 @@ export default class TabsComponent extends NestedComponent {
    *
    * @param index
    */
-  setTab(index) {
+  setTab(index, state) {
     if (
       !this.tabs ||
       !this.component.components ||
@@ -114,9 +114,15 @@ export default class TabsComponent extends NestedComponent {
     this.empty(this.tabs[this.currentTab]);
     _.remove(this.components, (comp) => comp.component.tab === this.currentTab);
     const components = this.hook('addComponents', tab.components, this);
-    _.each(components, (component) => this.addComponent(component, this.tabs[this.currentTab]));
-    this.checkConditions(this.root ? this.root.data : {});
-
+    _.each(components, (component) => this.addComponent(
+      component,
+      this.tabs[this.currentTab],
+      this.data,
+      null,
+      null,
+      state
+    ));
+    this.restoreValue();
     if (this.tabLinks.length <= index) {
       return;
     }
@@ -131,6 +137,13 @@ export default class TabsComponent extends NestedComponent {
       this.removeClass(tab, 'active');
     });
     this.addClass(this.tabs[index], 'active');
+    this.triggerChange();
+  }
+
+  destroy() {
+    const state = super.destroy() || {};
+    state.currentTab = this.currentTab;
+    return state;
   }
 
   /**
@@ -142,15 +155,16 @@ export default class TabsComponent extends NestedComponent {
    * @param before
    * @return {BaseComponent}
    */
-  addComponent(component, element, data, before) {
+  addComponent(component, element, data, before, noAdd, state) {
     component.tab = this.currentTab;
-    return super.addComponent(component, element, data, before);
+    return super.addComponent(component, element, data, before, noAdd, state);
   }
 
   /**
    * Only add the components for the active tab.
    */
-  addComponents() {
-    this.setTab(this.currentTab);
+  addComponents(element, data, options, state) {
+    const currentTab = state && state.currentTab ? state.currentTab : this.currentTab;
+    this.setTab(currentTab, state);
   }
 }

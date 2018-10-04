@@ -26,33 +26,36 @@ export default class ContentComponent extends BaseComponent {
   }
 
   setHTML() {
-    this.element.innerHTML = this.interpolate(this.component.html);
+    this.htmlElement.innerHTML = this.interpolate(this.component.html);
   }
 
   build() {
-    this.element = this.ce('div', {
+    this.createElement();
+    this.htmlElement = this.ce('div', {
       id: this.id,
-      class: `form-group ${this.component.customClass}`
+      class: `form-group ${this.component.className}`
     });
 
-    this.element.component = this;
+    this.htmlElement.component = this;
 
     if (this.options.builder) {
       const editorElement = this.ce('div');
+      this.element.appendChild(editorElement);
       this.addQuill(editorElement, this.wysiwygDefault, (element) => {
         this.component.html = element.value;
       }).then((editor) => {
         editor.setContents(editor.clipboard.convert(this.component.html));
-      });
-      this.element.appendChild(editorElement);
+      }).catch(err => console.warn(err));
     }
     else {
       this.setHTML();
+      if (this.component.refreshOnChange) {
+        this.on('change', () => this.setHTML(), true);
+      }
     }
 
-    if (this.component.refreshOnChange) {
-      this.on('change', () => this.setHTML());
-    }
+    this.element.appendChild(this.htmlElement);
+    this.attachLogic();
   }
 
   get emptyValue() {

@@ -9,35 +9,33 @@ lib: builder
 <div class="row">
   <div class="col-sm-8">
     <h3 class="text-center text-muted">The <a href="https://github.com/formio/formio.js" target="_blank">Form Builder</a> allows you to build a <select class="form-control" id="form-select" style="display: inline-block; width: 150px;"><option value="form">Form</option><option value="wizard">Wizard</option><option value="pdf">PDF</option></select></h3>
-    <div class="well" style="background-color: #fdfdfd;">
-      <div id="builder"></div>
-    </div>
+    <div id="builder"></div>
   </div>
   <div class="col-sm-4">
     <h3 class="text-center text-muted">as JSON Schema</h3>
-    <div class="well jsonviewer">
+    <div class="card card-body bg-light jsonviewer">
       <pre id="json"></pre>
     </div>
   </div>
 </div>
-<div class="row">
-  <div class="col-sm-8 col-sm-offset-2">
+<div class="row mt-4">
+  <div class="col-sm-8 offset-sm-2">
     <h3 class="text-center text-muted">which <a href="https://github.com/formio/ngFormio" target="_blank">Renders as a Form</a> in your Application</h3>
-    <div id="formio" class="well"></div>
+    <div id="formio" class="card card-body bg-light"></div>
   </div>
   <div class="clearfix"></div>
 </div>
-<div class="row">
-  <div class="col-sm-8 col-sm-offset-2">
+<div class="row mt-4">
+  <div class="col-sm-8 offset-sm-2">
     <h3 class="text-center text-muted">which creates a Submission JSON</h3>
-    <div class="well jsonviewer">
+    <div class="card card-body bg-light jsonviewer">
       <pre id="subjson"></pre>
     </div>
   </div>
   <div class="clearfix"></div>
 </div>
-<div class="row">
-  <div class="col-sm-10 col-sm-offset-1 text-center">
+<div class="row mt-4">
+  <div class="col-sm-10 offset-sm-1 text-center">
     <h3 class="text-center text-muted">which submits to our API Platform</h3>
     <p>hosted or on-premise</p>
     <a href="https://form.io" target="_blank"><img style="width:100%" src="https://help.form.io/assets/img/formioapi2.png" /></a>
@@ -48,7 +46,7 @@ lib: builder
     <a href="https://form.io" target="_blank" class="btn btn-lg btn-success">Get Started</a>
   </div>
 </div>
-<div class="row well" style="margin-top: 50px;">
+<div class="row card card-body bg-light mt-4">
   <div class="container">
     <div class="row">
       <div class="col-lg-12 text-center">
@@ -70,6 +68,8 @@ node server</pre>
   </div>
 </div>
 <script type="text/javascript">
+var jsonElement = document.getElementById('json');
+var formElement = document.getElementById('formio');
 var subJSON = document.getElementById('subjson');
 var builder = new Formio.FormBuilder(document.getElementById("builder"), {
   display: 'form',
@@ -92,32 +92,15 @@ var onForm = function(form) {
 };
 
 var setDisplay = function(display) {
-  builder.setDisplay(display).then(function(instance) {
-     var jsonElement = document.getElementById('json');
-     var formElement = document.getElementById('formio');
-     instance.on('saveComponent', function(event) {
-       var schema = instance.schema;
-       jsonElement.innerHTML = '';
-       formElement.innerHTML = '';
-       jsonElement.appendChild(document.createTextNode(JSON.stringify(schema, null, 4)));
-       Formio.createForm(formElement, schema).then(onForm);
+  builder.setDisplay(display).then(function(instance) {     
+     instance.on('change', function(form) {
+       if (form.components) {
+          formElement.innerHTML = '';
+          jsonElement.innerHTML = '';
+          jsonElement.appendChild(document.createTextNode(JSON.stringify(form, null, 4)));
+          Formio.createForm(formElement, form).then(onForm);
+       }
      });
-   
-     instance.on('editComponent', function(event) {
-       console.log('editComponent', event);
-     });
-     
-     instance.on('updateComponent', function(event) {
-       jsonElement.innerHTML = '';
-       jsonElement.appendChild(document.createTextNode(JSON.stringify(instance.schema, null, 4)));
-     });
-     
-     instance.on('deleteComponent', function(event) {
-       jsonElement.innerHTML = '';
-       jsonElement.appendChild(document.createTextNode(JSON.stringify(instance.schema, null, 4)));
-     });
-     
-     Formio.createForm(formElement, instance.schema).then(onForm);
    });
 };
 

@@ -1,5 +1,5 @@
 import BaseComponent from '../base/Base';
-import Choices from 'choices.js';
+import Choices from 'choices.js/assets/scripts/dist/choices.js';
 import _ from 'lodash';
 
 export default class TagsComponent extends BaseComponent {
@@ -65,7 +65,9 @@ export default class TagsComponent extends BaseComponent {
         value = [value];
       }
       this.choices.removeActiveItems();
-      this.choices.setValue(value);
+      if (value) {
+        this.choices.setValue(value);
+      }
     }
   }
 

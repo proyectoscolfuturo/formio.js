@@ -1,6 +1,7 @@
 /* global ace */
 import TextFieldComponent from '../textfield/TextField';
 import Formio from '../../Formio';
+import _ from 'lodash';
 
 export default class TextAreaComponent extends TextFieldComponent {
   static schema(...extend) {
@@ -74,7 +75,16 @@ export default class TextAreaComponent extends TextFieldComponent {
 
   createInput(container) {
     if (this.isPlain) {
-      return super.createInput(container);
+      if (this.options.readOnly) {
+        this.input = this.ce('div', {
+          class: 'well'
+        });
+        container.appendChild(this.input);
+        return this.input;
+      }
+      else {
+        return super.createInput(container);
+      }
     }
 
     if (this.htmlView) {
@@ -90,14 +100,19 @@ export default class TextAreaComponent extends TextFieldComponent {
       class: 'formio-wysiwyg-editor'
     });
     container.appendChild(this.input);
+    this.addCounter(container);
 
     if (this.component.editor === 'ace') {
-      this.editorReady = Formio.requireLibrary('ace', 'ace', 'https://cdnjs.cloudflare.com/ajax/libs/ace/1.3.0/ace.js', true)
+      this.editorReady = Formio.requireLibrary('ace', 'ace', 'https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.1/ace.js', true)
         .then(() => {
           const mode = this.component.as || 'javascript';
           this.editor = ace.edit(this.input);
           this.editor.on('change', () => {
-            this.updateValue(null, this.getConvertedValue(this.editor.getValue()));
+            const newValue = this.getConvertedValue(this.editor.getValue());
+            // Do not bother to update if they are both empty.
+            if (!_.isEmpty(newValue) || !_.isEmpty(this.dataValue)) {
+              this.updateValue(null, newValue);
+            }
           });
           this.editor.getSession().setTabSize(2);
           this.editor.getSession().setMode(`ace/mode/${mode}`);
@@ -132,7 +147,7 @@ export default class TextAreaComponent extends TextFieldComponent {
       }
 
       return quill;
-    });
+    }).catch(err => console.warn(err));
 
     return this.input;
   }
@@ -140,7 +155,7 @@ export default class TextAreaComponent extends TextFieldComponent {
   setConvertedValue(value) {
     if (this.component.as && this.component.as === 'json' && value) {
       try {
-        value = JSON.stringify(value);
+        value = JSON.stringify(value, null, 2);
       }
       catch (err) {
         console.warn(err);
@@ -167,9 +182,24 @@ export default class TextAreaComponent extends TextFieldComponent {
   }
 
   setValue(value, flags) {
+    //should set value if new value is not equal to current
+    let shouldSetValue = !_.isEqual(value, this.getValue());
+    //should set value if is in read only mode
+    shouldSetValue = shouldSetValue || this.options.readOnly;
+    if (!shouldSetValue) {
+      return;
+    }
     value = value || '';
     if (this.isPlain) {
-      return super.setValue(this.setConvertedValue(value), flags);
+      if (this.options.readOnly) {
+        // For readOnly, just view the contents.
+        this.input.innerHTML = this.interpolate(value);
+        this.dataValue = value;
+        return;
+      }
+      else {
+        return super.setValue(this.setConvertedValue(value), flags);
+      }
     }
 
     // Set the value when the editor is ready.
@@ -205,7 +235,7 @@ export default class TextAreaComponent extends TextFieldComponent {
   }
 
   getValue() {
-    if (this.viewOnly || this.htmlView) {
+    if (this.viewOnly || this.htmlView || this.options.readOnly) {
       return this.dataValue;
     }
 
@@ -217,7 +247,7 @@ export default class TextAreaComponent extends TextFieldComponent {
       return this.dataValue;
     }
 
-    return this.component.multiple ? [''] : '';
+    return this.component.multiple ? [] : '';
   }
 
   elementInfo() {

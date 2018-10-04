@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import BaseComponent from '../base/Base';
 import Promise from 'native-promise-only';
 import { isMongoId, eachComponent } from '../../utils/utils';
@@ -45,6 +46,14 @@ export default class FormComponent extends BaseComponent {
     return { data: {} };
   }
 
+  destroy() {
+    const state = super.destroy() || {};
+    if (this.subForm) {
+      this.subForm.destroy();
+    }
+    return state;
+  }
+
   /**
    * Render a subform.
    *
@@ -79,7 +88,7 @@ export default class FormComponent extends BaseComponent {
   /* eslint-disable max-statements */
   loadSubForm() {
     // Only load the subform if the subform isn't loaded and the conditions apply.
-    if (this.subFormLoaded || !super.checkConditions(this.root ? this.root.data : this.data)) {
+    if (this.subFormLoaded) {
       return this.subFormReady;
     }
     this.subFormLoaded = true;
@@ -92,6 +101,9 @@ export default class FormComponent extends BaseComponent {
     }
     if (this.options && this.options.readOnly) {
       srcOptions.readOnly = this.options.readOnly;
+    }
+    if (this.options && this.options.icons) {
+      srcOptions.icons = this.options.icons;
     }
     if (this.options && this.options.viewAsHtml) {
       srcOptions.viewAsHtml = this.options.viewAsHtml;
@@ -148,7 +160,7 @@ export default class FormComponent extends BaseComponent {
     else {
       (new Formio(this.formSrc)).loadForm({ params: { live: 1 } })
         .then((formObj) => this.renderSubForm(formObj, srcOptions))
-        .catch(err => this.subFormReadyReject(err));
+        .catch((err) => this.subFormReadyReject(err));
     }
     return this.subFormReady;
   }
@@ -163,11 +175,9 @@ export default class FormComponent extends BaseComponent {
   }
 
   checkConditions(data) {
-    if (this.subForm) {
-      return this.subForm.checkConditions(this.dataValue.data);
-    }
-
-    return super.checkConditions(data);
+    return (super.checkConditions(data) && this.subForm)
+      ? this.subForm.checkConditions(this.dataValue.data)
+      : false;
   }
 
   calculateValue(data, flags) {
@@ -176,6 +186,13 @@ export default class FormComponent extends BaseComponent {
     }
 
     return super.calculateValue(data, flags);
+  }
+
+  setPristine(pristine) {
+    super.setPristine(pristine);
+    if (this.subForm) {
+      this.subForm.setPristine(pristine);
+    }
   }
 
   /**
@@ -217,14 +234,16 @@ export default class FormComponent extends BaseComponent {
     // This submission has not been submitted yet.
     if (this.component.submit) {
       return this.loadSubForm().then(() => {
-        return this.subForm.submitForm().then(result => {
-          this.subForm.loading = false;
-          this.dataValue = this.component.reference ? {
-            _id: result.submission._id,
-            form: result.submission.form
-          } : result.submission;
-          return this.dataValue;
-        });
+        return this.subForm.submitForm()
+          .then(result => {
+            this.subForm.loading = false;
+            this.dataValue = this.component.reference ? {
+              _id: result.submission._id,
+              form: result.submission.form
+            } : result.submission;
+            return this.dataValue;
+          })
+          .catch(() => {});
       });
     }
     else {
@@ -239,16 +258,15 @@ export default class FormComponent extends BaseComponent {
     if (!this.options.beforeSubmit) {
       this.restoreValue();
     }
+    this.attachLogic();
   }
 
   setValue(submission, flags) {
     const changed = super.setValue(submission, flags);
-    if (this.subForm) {
-      this.subForm.setValue(submission, flags);
-    }
-    else {
-      this.loadSubForm().then((form) => {
-        if (submission && submission._id && form.formio && !flags.noload) {
+
+    (this.subForm ? Promise.resolve(this.subForm) : this.loadSubForm())
+      .then((form) => {
+        if (submission && submission._id && form.formio && !flags.noload && _.isEmpty(submission.data)) {
           const submissionUrl = `${form.formio.formsUrl}/${submission.form}/submission/${submission._id}`;
           form.setUrl(submissionUrl, this.options);
           form.nosubmit = false;
@@ -258,7 +276,7 @@ export default class FormComponent extends BaseComponent {
           form.setValue(submission, flags);
         }
       });
-    }
+
     return changed;
   }
 
@@ -267,5 +285,12 @@ export default class FormComponent extends BaseComponent {
       return this.subForm.getValue();
     }
     return this.dataValue;
+  }
+
+  getAllComponents() {
+    if (!this.subForm) {
+      return [];
+    }
+    return this.subForm.getAllComponents();
   }
 }

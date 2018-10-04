@@ -1,7 +1,15 @@
+/* global $ */
+
 import _ from 'lodash';
+import 'whatwg-fetch';
 import jsonLogic from 'json-logic-js';
-import moment from 'moment';
+import moment from 'moment-timezone/moment-timezone';
+import jtz from 'jstimezonedetect';
 import { lodashOperators } from './jsonlogic/operators';
+import Promise from 'native-promise-only';
+import { getValue } from './formUtils';
+
+export * from './formUtils';
 
 // Configure JsonLogic
 lodashOperators.forEach((name) => jsonLogic.add_operation(`_${name}`, _[name]));
@@ -59,6 +67,7 @@ export function evaluate(func, args, ret, tokenize) {
 
     try {
       func = new Function(...params, func);
+      args = _.values(args);
     }
     catch (err) {
       console.warn(`An error occured within the custom function for ${component.key}`, err);
@@ -67,9 +76,8 @@ export function evaluate(func, args, ret, tokenize) {
     }
   }
   if (typeof func === 'function') {
-    const values = _.values(args);
     try {
-      returnVal = func(...values);
+      returnVal = Array.isArray(args) ? func(...args) : func(args);
     }
     catch (err) {
       returnVal = null;
@@ -152,256 +160,6 @@ export function isMongoId(text) {
 }
 
 /**
- * Determine if a component is a layout component or not.
- *
- * @param {Object} component
- *   The component to check.
- *
- * @returns {Boolean}
- *   Whether or not the component is a layout component.
- */
-export function isLayoutComponent(component) {
-  return Boolean(
-    (component.columns && Array.isArray(component.columns)) ||
-    (component.rows && Array.isArray(component.rows)) ||
-    (component.components && Array.isArray(component.components))
-  );
-}
-
-/**
- * Iterate through each component within a form.
- *
- * @param {Object} components
- *   The components to iterate.
- * @param {Function} fn
- *   The iteration function to invoke for each component.
- * @param {Boolean} includeAll
- *   Whether or not to include layout components.
- * @param {String} path
- *   The current data path of the element. Example: data.user.firstName
- * @param {Object} parent
- *   The parent object.
- */
-export function eachComponent(components, fn, includeAll, path, parent) {
-  if (!components) return;
-  path = path || '';
-  components.forEach((component) => {
-    const hasColumns = component.columns && Array.isArray(component.columns);
-    const hasRows = component.rows && Array.isArray(component.rows);
-    const hasComps = component.components && Array.isArray(component.components);
-    let noRecurse = false;
-    const newPath = component.key ? (path ? (`${path}.${component.key}`) : component.key) : '';
-
-    // Keep track of parent references.
-    if (parent) {
-      // Ensure we don't create infinite JSON structures.
-      component.parent = _.clone(parent);
-      delete component.parent.components;
-      delete component.parent.componentMap;
-      delete component.parent.columns;
-      delete component.parent.rows;
-    }
-
-    if (includeAll || component.tree || (!hasColumns && !hasRows && !hasComps)) {
-      noRecurse = fn(component, newPath);
-    }
-
-    const subPath = () => {
-      if (
-        component.key &&
-        (
-          ['datagrid', 'container', 'editgrid'].includes(component.type) ||
-          component.tree
-        )
-      ) {
-        return newPath;
-      }
-      else if (
-        component.key &&
-        component.type === 'form'
-      ) {
-        return `${newPath}.data`;
-      }
-      return path;
-    };
-
-    if (!noRecurse) {
-      if (hasColumns) {
-        component.columns.forEach((column) =>
-          eachComponent(column.components, fn, includeAll, subPath(), parent ? component : null));
-      }
-
-      else if (hasRows) {
-        component.rows.forEach((row) => {
-          if (Array.isArray(row)) {
-            row.forEach((column) =>
-              eachComponent(column.components, fn, includeAll, subPath(), parent ? component : null));
-          }
-        });
-      }
-
-      else if (hasComps) {
-        eachComponent(component.components, fn, includeAll, subPath(), parent ? component : null);
-      }
-    }
-  });
-}
-
-/**
- * Matches if a component matches the query.
- *
- * @param component
- * @param query
- * @return {boolean}
- */
-export function matchComponent(component, query) {
-  if (_.isString(query)) {
-    return component.key === query;
-  }
-  else {
-    let matches = false;
-    _.forOwn(query, (value, key) => {
-      matches = (_.get(component, key) === value);
-      if (!matches) {
-        return false;
-      }
-    });
-    return matches;
-  }
-}
-
-/**
- * Get a component by its key
- *
- * @param {Object} components
- *   The components to iterate.
- * @param {String|Object} key
- *   The key of the component to get, or a query of the component to search.
- *
- * @returns {Object}
- *   The component that matches the given key, or undefined if not found.
- */
-export function getComponent(components, key, includeAll) {
-  let result;
-  eachComponent(components, (component, path) => {
-    if (matchComponent(component, key)) {
-      component.path = path;
-      result = component;
-      return true;
-    }
-  }, includeAll);
-  return result;
-}
-
-/**
- * Finds a component provided a query of properties of that component.
- *
- * @param components
- * @param query
- * @return {*}
- */
-export function findComponents(components, query) {
-  const results = [];
-  eachComponent(components, (component, path) => {
-    if (matchComponent(component, query)) {
-      component.path = path;
-      results.push(component);
-    }
-  }, true);
-  return results;
-}
-
-/**
- * Flatten the form components for data manipulation.
- *
- * @param {Object} components
- *   The components to iterate.
- * @param {Boolean} includeAll
- *   Whether or not to include layout components.
- *
- * @returns {Object}
- *   The flattened components map.
- */
-export function flattenComponents(components, includeAll) {
-  const flattened = {};
-  eachComponent(components, (component, path) => {
-    flattened[path] = component;
-  }, includeAll);
-  return flattened;
-}
-
-/**
- * Returns if this component has a conditional statement.
- *
- * @param component - The component JSON schema.
- *
- * @returns {boolean} - TRUE - This component has a conditional, FALSE - No conditional provided.
- */
-export function hasCondition(component) {
-  return Boolean(
-    (component.customConditional) ||
-    (component.conditional && component.conditional.when) ||
-    (component.conditional && component.conditional.json)
-  );
-}
-
-/**
- * Extension of standard #parseFloat(value) function, that also clears input string.
- *
- * @param {any} value
- *   The value to parse.
- *
- * @returns {Number}
- *   Parsed value.
- */
-export function parseFloatExt(value) {
-  return parseFloat(_.isString(value)
-    ? value.replace(/[^\de.+-]/gi, '')
-    : value);
-}
-
-/**
- * Formats provided value in way how Currency component uses it.
- *
- * @param {any} value
- *   The value to format.
- *
- * @returns {String}
- *   Value formatted for Currency component.
- */
-export function formatAsCurrency(value) {
-  const parsedValue = parseFloatExt(value);
-
-  if (_.isNaN(parsedValue)) {
-    return '';
-  }
-
-  const parts = _.round(parsedValue, 2)
-    .toString()
-    .split('.');
-  parts[0] = _.chunk(Array.from(parts[0]).reverse(), 3)
-    .reverse()
-    .map((part) => part
-      .reverse()
-      .join(''))
-    .join(',');
-  parts[1] = _.pad(parts[1], 2, '0');
-  return parts.join('.');
-}
-
-/**
- * Escapes RegEx characters in provided String value.
- *
- * @param {String} value
- *   String for escaping RegEx characters.
- * @returns {string}
- *   String with escaped RegEx characters.
- */
-export function escapeRegExCharacters(value) {
-  return value.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
-}
-
-/**
  * Checks the calculated value for a provided component and data.
  *
  * @param {Object} component
@@ -439,22 +197,26 @@ export function checkSimpleConditional(component, condition, row, data) {
     value = getValue({ data: row }, condition.when);
   }
   if (data && _.isNil(value)) {
-    value = getValue({ data: data }, condition.when);
+    value = getValue({ data }, condition.when);
   }
   // FOR-400 - Fix issue where falsey values were being evaluated as show=true
   if (_.isNil(value)) {
     value = '';
   }
+
+  const eq = String(condition.eq);
+  const show = String(condition.show);
+
   // Special check for selectboxes component.
   if (_.isObject(value) && _.has(value, condition.eq)) {
-    return value[condition.eq].toString() === condition.show.toString();
+    return String(value[condition.eq]) === show;
   }
   // FOR-179 - Check for multiple values.
-  if (Array.isArray(value) && value.includes(condition.eq)) {
-    return (condition.show.toString() === 'true');
+  if (Array.isArray(value) && value.map(String).includes(eq)) {
+    return show === 'true';
   }
 
-  return (value.toString() === condition.eq.toString()) === (condition.show.toString() === 'true');
+  return (String(value) === eq) === (show === 'true');
 }
 
 /**
@@ -570,41 +332,6 @@ export function setActionProperty(component, action, row, data, result, instance
 }
 
 /**
- * Get the value for a component key, in the given submission.
- *
- * @param {Object} submission
- *   A submission object to search.
- * @param {String} key
- *   A for components API key to search for.
- */
-export function getValue(submission, key) {
-  const search = (data) => {
-    if (_.isPlainObject(data)) {
-      if (_.has(data, key)) {
-        return data[key];
-      }
-
-      let value = null;
-
-      _.forOwn(data, (prop) => {
-        const result = search(prop);
-        if (!_.isNil(result)) {
-          value = result;
-          return false;
-        }
-      });
-
-      return value;
-    }
-    else {
-      return null;
-    }
-  };
-
-  return search(submission.data);
-}
-
-/**
  * Interpolate a string and add data replacements.
  *
  * @param string
@@ -705,6 +432,152 @@ export function isValidDate(date) {
   return _.isDate(date) && !_.isNaN(date.getDate());
 }
 
+/**
+ * Get the current timezone string.
+ *
+ * @return {string}
+ */
+export function currentTimezone() {
+  if (moment.currentTimezone) {
+    return moment.currentTimezone;
+  }
+  moment.currentTimezone = jtz.determine().name();
+  return moment.currentTimezone;
+}
+
+/**
+ * Get an offset date provided a date object and timezone object.
+ *
+ * @param date
+ * @param timezone
+ * @return {Date}
+ */
+export function offsetDate(date, timezone) {
+  if (timezone === 'UTC') {
+    return {
+      date: new Date(date.getTime() + (date.getTimezoneOffset() * 60000)),
+      abbr: 'UTC'
+    };
+  }
+  const dateMoment = moment(date).tz(timezone);
+  return {
+    date: new Date(date.getTime() + ((dateMoment.utcOffset() + date.getTimezoneOffset()) * 60000)),
+    abbr: dateMoment.format('z')
+  };
+}
+
+/**
+ * Externally load the timezone data.
+ *
+ * @return {Promise<any> | *}
+ */
+export function loadZones(timezone) {
+  if (timezone === currentTimezone()) {
+    // Return non-resolving promise.
+    return new Promise(_.noop);
+  }
+  if (timezone === 'UTC') {
+    // Return non-resolving promise.
+    return new Promise(_.noop);
+  }
+
+  if (moment.zonesPromise) {
+    return moment.zonesPromise;
+  }
+  return moment.zonesPromise = fetch(
+    'https://cdn.rawgit.com/moment/moment-timezone/develop/data/packed/latest.json',
+  ).then(resp => resp.json().then(zones => {
+    moment.tz.load(zones);
+    moment.zonesLoaded = true;
+  }));
+}
+
+/**
+ * Set the timezone text and replace once timezones have loaded.
+ *
+ * @param offsetFormat
+ * @param stdFormat
+ * @return {*}
+ */
+export function timezoneText(offsetFormat, stdFormat) {
+  loadZones();
+  if (moment.zonesLoaded) {
+    return offsetFormat();
+  }
+  const id = getRandomComponentId();
+  let tries = 0;
+  moment.zonesPromise.then(function replaceZone() {
+    const element = document.getElementById(id);
+    if (element) {
+      element.innerHTML = offsetFormat();
+    }
+    else if (tries++ < 5) {
+      setTimeout(replaceZone, 100);
+    }
+  });
+  // For now just return the current format, and replace once zones are loaded.
+  return `<span id='${id}'>${stdFormat()}</span>`;
+}
+
+/**
+ * Format a date provided a value, format, and timezone object.
+ *
+ * @param value
+ * @param format
+ * @param timezone
+ * @return {string}
+ */
+export function formatDate(value, format, timezone) {
+  const momentDate = moment(value);
+  if (timezone === currentTimezone()) {
+    // See if our format contains a "z" timezone character.
+    if (format.match(/\s(z$|z\s)/)) {
+      // Return the timezoneText.
+      return timezoneText(
+        () => momentDate.tz(timezone).format(convertFormatToMoment(format)),
+        () => momentDate.format(convertFormatToMoment(format.replace(/\s(z$|z\s)/, '')))
+      );
+    }
+
+    // Return the standard format.
+    return momentDate.format(convertFormatToMoment(format));
+  }
+  if (timezone === 'UTC') {
+    const offset = offsetDate(momentDate.toDate(), 'UTC');
+    return `${moment(offset.date).format(convertFormatToMoment(format))} UTC`;
+  }
+
+  // Return the timezoneText.
+  return timezoneText(
+    () => momentDate.tz(timezone).format(`${convertFormatToMoment(format)} z`),
+    () => momentDate.format(convertFormatToMoment(format))
+  );
+}
+
+/**
+ * Pass a format function to format within a timezone.
+ *
+ * @param formatFn
+ * @param date
+ * @param format
+ * @param timezone
+ * @return {string}
+ */
+export function formatOffset(formatFn, date, format, timezone) {
+  if (timezone === currentTimezone()) {
+    return formatFn(date, format);
+  }
+  if (timezone === 'UTC') {
+    return `${formatFn(offsetDate(date, 'UTC').date, format)} UTC`;
+  }
+
+  // Return the timezone text.
+  return timezoneText(() => {
+    const offset = offsetDate(date, timezone);
+    return `${formatFn(offset.date, format)} ${offset.abbr}`;
+  }, () => formatFn(date, format));
+}
+
 export function getLocaleDateFormatInfo(locale) {
   const formatInfo = {};
 
@@ -724,6 +597,9 @@ export function getLocaleDateFormatInfo(locale) {
  */
 export function convertFormatToFlatpickr(format) {
   return format
+  // Remove the Z timezone offset, not supported by flatpickr.
+    .replace(/Z/g, '')
+
     // Year conversion.
     .replace(/y/g, 'Y')
     .replace('YYYY', 'Y')
@@ -737,7 +613,7 @@ export function convertFormatToFlatpickr(format) {
 
     // Day in month.
     .replace(/d/g, 'j')
-    .replace('jj', 'd')
+    .replace(/jj/g, 'd')
 
     // Day in week.
     .replace('EEEE', 'l')
@@ -766,6 +642,16 @@ export function convertFormatToMoment(format) {
     .replace(/E/g, 'd')
     // AM/PM marker
     .replace(/a/g, 'A');
+}
+
+export function convertFormatToMask(format) {
+  return format
+    // Short and long month replacement.
+    .replace(/(MMM|MMMM)/g, 'MM')
+    // Year conversion
+    .replace(/[ydhmsHM]/g, '9')
+    // AM/PM conversion
+    .replace(/a/g, 'AA');
 }
 
 /**
@@ -822,9 +708,16 @@ export function matchInputMask(value, inputMask) {
 
 export function getNumberSeparators(lang = 'en') {
   const formattedNumberString = (12345.6789).toLocaleString(lang);
+  const delimeters = formattedNumberString.match(/..(.)...(.)../);
+  if (!delimeters) {
+    return {
+      delimiter: ',',
+      decimalSeparator: '.'
+    };
+  }
   return {
-    delimiter: formattedNumberString.match(/12(.*)345/)[1],
-    decimalSeparator: formattedNumberString.match(/345(.*)67/)[1]
+    delimiter: (delimeters.length > 1) ? delimeters[1] : ',',
+    decimalSeparator: (delimeters.length > 2) ? delimeters[2] : '.',
   };
 }
 
@@ -916,4 +809,75 @@ export function fieldData(data, component) {
     }
     return data[component.key];
   }
+}
+
+/**
+ * Delays function execution with possibility to execute function synchronously or cancel it.
+ *
+ * @param fn Function to delay
+ * @param delay Delay time
+ * @return {*}
+ */
+export function delay(fn, delay = 0, ...args) {
+  const timer = setTimeout(fn, delay, ...args);
+
+  function cancel() {
+    clearTimeout(timer);
+  }
+
+  function earlyCall() {
+    cancel();
+    return fn(...args);
+  }
+
+  earlyCall.timer = timer;
+  earlyCall.cancel = cancel;
+
+  return earlyCall;
+}
+
+/**
+ * Iterate the given key to make it unique.
+ *
+ * @param {String} key
+ *   Modify the component key to be unique.
+ *
+ * @returns {String}
+ *   The new component key.
+ */
+export function iterateKey(key) {
+  if (!key.match(/(\d+)$/)) {
+    return `${key}2`;
+  }
+
+  return key.replace(/(\d+)$/, function(suffix) {
+    return Number(suffix) + 1;
+  });
+}
+
+/**
+ * Determines a unique key within a map provided the base key.
+ *
+ * @param map
+ * @param base
+ * @return {*}
+ */
+export function uniqueKey(map, base) {
+  let newKey = base;
+  while (map.hasOwnProperty(newKey)) {
+    newKey = iterateKey(newKey);
+  }
+  return newKey;
+}
+
+/**
+ * Determines the major version number of bootstrap.
+ *
+ * @return {number}
+ */
+export function bootstrapVersion() {
+  if ((typeof $ === 'function') && (typeof $().collapse === 'function')) {
+    return parseInt($.fn.collapse.Constructor.VERSION.split('.')[0], 10);
+  }
+  return 0;
 }

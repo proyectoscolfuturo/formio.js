@@ -51,6 +51,7 @@ export default class PDF extends Webform {
         form.projectUrl = this.formio.projectUrl;
         form.url = this.formio.formUrl;
         form.base = this.formio.base;
+        this.postMessage({ name: 'token', data: this.formio.getToken() });
       }
       this.postMessage({ name: 'form', data: form });
     });
@@ -60,29 +61,34 @@ export default class PDF extends Webform {
     submission.readOnly = !!this.options.readOnly;
     this.postMessage({ name: 'submission', data: submission });
     return super.setSubmission(submission).then(() => {
-      this.formio.getDownloadUrl().then((url) => {
-        // Add a download button if it has a download url.
-        if (!url) {
-          return;
-        }
-        if (!this.downloadButton) {
-          this.downloadButton = this.ce('a', {
-            href: url,
-            target: '_blank',
-            style: 'position:absolute;right:10px;top:110px;cursor:pointer;'
-          }, this.ce('img', {
-            src: require('./pdf.image'),
-            style: 'width:3em;'
-          }));
-          this.element.insertBefore(this.downloadButton, this.iframe);
-        }
-      });
+      if (this.formio) {
+        this.formio.getDownloadUrl().then((url) => {
+          // Add a download button if it has a download url.
+          if (!url) {
+            return;
+          }
+          if (!this.downloadButton) {
+            if (this.options.primaryProject) {
+              url += `&project=${this.options.primaryProject}`;
+            }
+            this.downloadButton = this.ce('a', {
+              href: url,
+              target: '_blank',
+              style: 'position:absolute;right:10px;top:110px;cursor:pointer;'
+            }, this.ce('img', {
+              src: require('./pdf.image'),
+              style: 'width:3em;'
+            }));
+            this.element.insertBefore(this.downloadButton, this.iframe);
+          }
+        });
+      }
     });
   }
 
-  addComponent(component, element, data, before) {
+  addComponent(component, element, data, before, noAdd, state) {
     // Never add the component to the DOM.
-    super.addComponent(component, element, data, before, true);
+    super.addComponent(component, element, data, before, true, state);
   }
 
   // Iframe should always be shown.
@@ -126,10 +132,10 @@ export default class PDF extends Webform {
     // Handle an iframe submission.
     this.on('iframe-submission', (submission) => {
       this.setSubmission(submission).then(() => this.submit());
-    });
+    }, true);
 
     // Trigger when this form is ready.
-    this.on('iframe-ready', () => this.iframeReadyResolve());
+    this.on('iframe-ready', () => this.iframeReadyResolve(), true);
 
     this.appendChild(this.element, [
       this.zoomIn,

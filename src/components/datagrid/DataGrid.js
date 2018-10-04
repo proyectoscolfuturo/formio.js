@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import NestedComponent from '../nested/NestedComponent';
+import BaseComponent from '../base/Base';
 
 export default class DataGridComponent extends NestedComponent {
   static schema(...extend) {
@@ -9,6 +10,7 @@ export default class DataGridComponent extends NestedComponent {
       type: 'datagrid',
       clearOnHide: true,
       input: true,
+      tree: true,
       components: []
     }, ...extend);
   }
@@ -79,6 +81,16 @@ export default class DataGridComponent extends NestedComponent {
   build() {
     this.createElement();
     this.createLabel(this.element);
+    let tableClass = 'table datagrid-table table-bordered form-group formio-data-grid ';
+    _.each(['striped', 'bordered', 'hover', 'condensed'], (prop) => {
+      if (this.component[prop]) {
+        tableClass += `table-${prop} `;
+      }
+    });
+    this.tableElement = this.ce('table', {
+      class: tableClass
+    });
+    this.element.appendChild(this.tableElement);
     if (!this.dataValue.length) {
       this.addNewValue();
     }
@@ -86,6 +98,7 @@ export default class DataGridComponent extends NestedComponent {
     this.errorContainer = this.element;
     this.restoreValue();
     this.createDescription(this.element);
+    this.attachLogic();
   }
 
   setVisibleComponents() {
@@ -109,21 +122,12 @@ export default class DataGridComponent extends NestedComponent {
 
   buildRows() {
     this.setVisibleComponents();
-    this.clear();
-    this.createLabel(this.element);
-    let tableClass = 'table datagrid-table table-bordered form-group formio-data-grid ';
-    _.each(['striped', 'bordered', 'hover', 'condensed'], (prop) => {
-      if (this.component[prop]) {
-        tableClass += `table-${prop} `;
-      }
-    });
-    this.tableElement = this.ce('table', {
-      class: tableClass
-    });
+    const state = this.destroy();
+    this.empty(this.tableElement);
 
     // Build the rows.
     const tableRows = [];
-    this.dataValue.forEach((row, rowIndex) => tableRows.push(this.buildRow(row, rowIndex)));
+    this.dataValue.forEach((row, rowIndex) => tableRows.push(this.buildRow(row, rowIndex, state.rows[rowIndex])));
 
     // Create the header (must happen after build rows to get correct column length)
     const header = this.createHeader();
@@ -142,9 +146,6 @@ export default class DataGridComponent extends NestedComponent {
         )
       ));
     }
-
-    // Add the table to the element.
-    this.element.appendChild(this.tableElement);
   }
 
   // Build the header.
@@ -173,6 +174,18 @@ export default class DataGridComponent extends NestedComponent {
     return needsHeader ? thead : null;
   }
 
+  get dataValue() {
+    const dataValue = super.dataValue;
+    if (!dataValue || !_.isArray(dataValue)) {
+      return this.emptyValue;
+    }
+    return dataValue;
+  }
+
+  set dataValue(value) {
+    super.dataValue = value;
+  }
+
   get defaultValue() {
     const value = super.defaultValue;
     if (_.isArray(value)) {
@@ -184,7 +197,8 @@ export default class DataGridComponent extends NestedComponent {
     return this.emptyValue;
   }
 
-  buildRow(row, index) {
+  buildRow(row, index, state) {
+    state = state || {};
     this.rows[index] = {};
     let lastColumn = null;
     if (this.hasRemoveButtons()) {
@@ -204,38 +218,57 @@ export default class DataGridComponent extends NestedComponent {
     }
     return this.ce('tr', null,
       [
-        this.component.components.map((col, colIndex) => this.buildComponent(col, colIndex, row, index)),
+        this.component.components.map((col, colIndex) =>
+          this.buildComponent(col, colIndex, row, index, state[col.key])
+        ),
         lastColumn
       ]
     );
   }
 
-  destroy(all) {
-    super.destroy(all);
-    _.each(this.rows, row => _.each(row, col => this.removeComponent(col, row)));
+  destroyRows() {
+    const state = {};
+    state.rows = state.rows || {};
+    _.each(this.rows, (row, rowIndex) => _.each(row, col => {
+      state.rows[rowIndex] = state.rows[rowIndex] || {};
+      const compState = this.removeComponent(col, row);
+      if (col.key && compState) {
+        state.rows[rowIndex][col.key] = compState;
+      }
+    }));
     this.rows = [];
+    return state;
   }
 
-  buildComponent(col, colIndex, row, rowIndex) {
-    if (!this.visibleColumns || (this.visibleColumns.hasOwnProperty(col.key) && !this.visibleColumns[col.key])) {
-      return;
-    }
+  destroy() {
+    const state = this.destroyRows();
+    super.destroy();
+    return state;
+  }
 
-    const container = this.ce('td');
-    container.noDrop = true;
+  buildComponent(col, colIndex, row, rowIndex, state) {
+    var container;
+    const isVisible = this.visibleColumns &&
+      (!this.visibleColumns.hasOwnProperty(col.key) || this.visibleColumns[col.key]);
+    if (isVisible || this.options.builder) {
+      container = this.ce('td');
+      container.noDrop = true;
+    }
     const column = _.clone(col);
     const options = _.clone(this.options);
     options.name += `[${rowIndex}]`;
     options.row = `${rowIndex}-${colIndex}`;
+    options.inDataGrid = true;
     const comp = this.createComponent(_.assign({}, column, {
-      label: column.dataGridLabel ? column.label : false,
       row: options.row
-    }), options, row);
+    }), options, row, null, state);
     comp.rowIndex = rowIndex;
     this.hook('addComponent', container, comp, this);
-    container.appendChild(comp.getElement());
     this.rows[rowIndex][column.key] = comp;
-    return container;
+    if (isVisible || this.options.builder) {
+      container.appendChild(comp.getElement());
+      return container;
+    }
   }
 
   checkConditions(data) {
@@ -251,8 +284,11 @@ export default class DataGridComponent extends NestedComponent {
     _.each(this.component.components, (col) => {
       let showColumn = false;
       _.each(this.rows, (comps) => {
-        showColumn |= comps[col.key].checkConditions(data);
+        if (comps && comps[col.key] && typeof comps[col.key].checkConditions === 'function') {
+          showColumn |= comps[col.key].checkConditions(data);
+        }
       });
+      showColumn = showColumn && col.type !== 'hidden' && !col.hidden;
       if (
         (this.visibleColumns[col.key] && !showColumn) ||
         (!this.visibleColumns[col.key] && showColumn)
@@ -273,6 +309,12 @@ export default class DataGridComponent extends NestedComponent {
     return show;
   }
 
+  updateValue(flags, value) {
+    // Intentionally skip over nested component updateValue method to keep recursive update from occurring with sub components.
+    return BaseComponent.prototype.updateValue.call(this, flags, value);
+  }
+
+  /* eslint-disable max-statements */
   setValue(value, flags) {
     flags = this.getFlags.apply(this, arguments);
     if (!value) {
@@ -290,27 +332,53 @@ export default class DataGridComponent extends NestedComponent {
     }
 
     const changed = this.hasChanged(value, this.dataValue);
+
+    //always should build if not built yet OR is trying to set empty value (in order to prevent deleting last row)
+    let shouldBuildRows = !this.isBuilt || changed || _.isEqual(this.emptyValue, value);
+    //check if visible columns changed
+    let visibleColumnsAmount = 0;
+    _.forEach(this.visibleColumns, (value) => {
+      if (value) {
+        visibleColumnsAmount++;
+      }
+    });
+    const visibleComponentsAmount = this.visibleComponents ? this.visibleComponents.length : 0;
+    //should build if visible columns changed
+    shouldBuildRows = shouldBuildRows || visibleColumnsAmount !== visibleComponentsAmount;
+    //loop through all rows and check if there is field in new value that differs from current value
+    const keys = this.componentComponents.map((component) => {
+      return component.key;
+    });
+    for (let i = 0; i < value.length; i++) {
+      if (shouldBuildRows) {
+        break;
+      }
+      const valueRow = value[i];
+      for (let j = 0; j < keys.length; j++) {
+        const key = keys[j];
+        const newFieldValue = valueRow[key];
+        const currentFieldValue = this.rows[i] && this.rows[i][key] ? this.rows[i][key].getValue() : undefined;
+        const defaultFieldValue = this.rows[i] && this.rows[i][key] ? this.rows[i][key].defaultValue : undefined;
+        const isMissingValue = newFieldValue === undefined && currentFieldValue === defaultFieldValue;
+        if (!isMissingValue && !_.isEqual(newFieldValue, currentFieldValue)) {
+          shouldBuildRows = true;
+          break;
+        }
+      }
+    }
     this.dataValue = value;
-    this.buildRows();
+    if (shouldBuildRows) {
+      this.buildRows();
+    }
     _.each(this.rows, (row, index) => {
       if (value.length <= index) {
         return;
       }
-      _.each(row, (col, key) => {
-        if (col.type === 'components') {
-          col.setValue(value[index], flags);
-        }
-        else if (value[index].hasOwnProperty(key)) {
-          col.setValue(value[index][key], flags);
-        }
-        else {
-          col.data = value[index];
-          col.setValue(col.defaultValue, flags);
-        }
-      });
+      _.each(row, component => this.setNestedValue(component, value[index], flags));
     });
     return changed;
   }
+  /* eslint-enable max-statements */
 
   /**
    * Get the value of this component.
@@ -318,19 +386,6 @@ export default class DataGridComponent extends NestedComponent {
    * @returns {*}
    */
   getValue() {
-    if (this.viewOnly) {
-      return this.dataValue;
-    }
-    const values = [];
-    _.each(this.rows, (row) => {
-      const value = {};
-      _.each(row, (col) => {
-        if (col && col.key) {
-          _.set(value, col.key, col.getValue());
-        }
-      });
-      values.push(value);
-    });
-    return values;
+    return this.dataValue;
   }
 }

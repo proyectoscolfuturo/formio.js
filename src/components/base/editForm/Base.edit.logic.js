@@ -76,8 +76,9 @@ export default [
                     type: 'select',
                     input: true,
                     label: 'When the form component:',
-                    key: 'conditional.when',
+                    key: 'when',
                     dataSrc: 'custom',
+                    valueProperty: 'value',
                     data: {
                       custom: `
                         utils.eachComponent(instance.root.editForm.components, function(component, path) {
@@ -203,7 +204,7 @@ export default [
                     },
                     {
                       label: 'required',
-                      value: 'validation.required',
+                      value: 'validate.required',
                       type: 'boolean'
                     },
                     {
@@ -234,6 +235,16 @@ export default [
                     {
                       label: 'Paceholder',
                       value: 'placeholder',
+                      type: 'string'
+                    },
+                    {
+                      label: 'CSS Class',
+                      value: 'className',
+                      type: 'string'
+                    },
+                    {
+                      label: 'Container Custom Class',
+                      value: 'customClass',
                       type: 'string'
                     }
                   ],

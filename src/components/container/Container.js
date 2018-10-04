@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import NestedComponent from '../nested/NestedComponent';
+import BaseComponent from '../base/Base';
 
 export default class ContainerComponent extends NestedComponent {
   static schema(...extend) {
@@ -8,6 +9,7 @@ export default class ContainerComponent extends NestedComponent {
       key: 'container',
       clearOnHide: true,
       input: true,
+      tree: true,
       components: []
     }, ...extend);
   }
@@ -32,12 +34,20 @@ export default class ContainerComponent extends NestedComponent {
     return ContainerComponent.schema();
   }
 
-  build() {
+  build(state) {
     this.createElement();
+    const labelAtTheBottom = this.component.labelPosition === 'bottom';
+    if (!labelAtTheBottom) {
+      this.createLabel(this.element);
+    }
     if (!this.hasValue()) {
       this.dataValue = {};
     }
-    this.addComponents(this.getContainer(), this.dataValue);
+    this.addComponents(this.getContainer(), this.dataValue, null, state);
+    if (labelAtTheBottom) {
+      this.createLabel(this.element);
+    }
+    this.attachLogic();
   }
 
   get emptyValue() {
@@ -49,12 +59,12 @@ export default class ContainerComponent extends NestedComponent {
   }
 
   getValue() {
-    if (this.viewOnly) {
-      return this.dataValue;
-    }
-    const value = {};
-    _.each(this.components, (component) => _.set(value, component.key, component.getValue()));
-    return value;
+    return this.dataValue;
+  }
+
+  updateValue(flags, value) {
+    // Intentionally skip over nested component updateValue method to keep recursive update from occurring with sub components.
+    return BaseComponent.prototype.updateValue.call(this, flags, value);
   }
 
   setValue(value, flags) {
@@ -62,24 +72,15 @@ export default class ContainerComponent extends NestedComponent {
     if (!value || !_.isObject(value)) {
       return;
     }
-    if (this.hasValue() && _.isEmpty(this.dataValue)) {
+    const hasValue = this.hasValue();
+    if (hasValue && _.isEmpty(this.dataValue)) {
       flags.noValidate = true;
     }
-    const changed = this.hasChanged(value, this.dataValue);
-    this.dataValue = value;
-    _.each(this.components, (component) => {
-      if (component.type === 'components') {
-        component.setValue(value, flags);
-      }
-      else if (_.has(value, component.key)) {
-        component.setValue(_.get(value, component.key), flags);
-      }
-      else {
-        component.data = value;
-        component.setValue(component.defaultValue, flags);
-      }
-    });
-    this.updateValue(flags);
-    return changed;
+    if (!hasValue) {
+      // Set the data value and then reset each component to use the new data object.
+      this.dataValue = {};
+      this.getComponents().forEach(component => (component.data = this.dataValue));
+    }
+    return super.setValue(value, flags);
   }
 }

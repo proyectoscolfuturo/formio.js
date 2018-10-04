@@ -28,6 +28,10 @@ export default class RadioComponent extends BaseComponent {
     return RadioComponent.schema();
   }
 
+  get emptyValue() {
+    return '';
+  }
+
   elementInfo() {
     const info = super.elementInfo();
     info.type = 'input';
@@ -183,24 +187,14 @@ export default class RadioComponent extends BaseComponent {
   }
 
   setValueAt(index, value) {
-    if (this.inputs && this.inputs[index]) {
-      let inputValue = this.inputs[index].value;
-      if (inputValue === 'true') {
-        inputValue = true;
-      }
-      else if (inputValue === 'false') {
-        inputValue = false;
-      }
-      else if (!isNaN(parseInt(inputValue, 10)) && isFinite(inputValue)) {
-        inputValue = parseInt(inputValue, 10);
-      }
-
-      this.inputs[index].checked = (inputValue === value);
+    if (this.inputs && this.inputs[index] && value !== null && value !== undefined) {
+      const inputValue = this.inputs[index].value;
+      this.inputs[index].checked = (inputValue === value.toString());
     }
   }
 
-  updateValue(value, flags) {
-    const changed = super.updateValue(value, flags);
+  updateValue(flags, value) {
+    const changed = super.updateValue(flags, value);
     if (changed) {
       //add/remove selected option class
       const value = this.dataValue;
@@ -218,9 +212,5 @@ export default class RadioComponent extends BaseComponent {
       });
     }
     return changed;
-  }
-
-  destroy() {
-    super.destroy.apply(this, Array.prototype.slice.apply(arguments));
   }
 }

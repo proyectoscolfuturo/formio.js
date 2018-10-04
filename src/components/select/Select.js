@@ -1,4 +1,4 @@
-import Choices from 'choices.js';
+import Choices from 'choices.js/assets/scripts/dist/choices.js';
 import _ from 'lodash';
 import BaseComponent from '../base/Base';
 import Formio from '../../Formio';
@@ -18,9 +18,10 @@ export default class SelectComponent extends BaseComponent {
       },
       dataSrc: 'values',
       valueProperty: '',
-      refreshOn: '',
       filter: '',
       searchEnabled: true,
+      searchField: '',
+      minSearch: 0,
       authenticate: false,
       template: '<span>{{ item.label }}</span>',
       selectFields: ''
@@ -67,11 +68,8 @@ export default class SelectComponent extends BaseComponent {
     return SelectComponent.schema();
   }
 
-  refreshItems() {
-    this.triggerUpdate();
-    if (this.component.clearOnRefresh) {
-      this.setValue(null);
-    }
+  get emptyValue() {
+    return '';
   }
 
   elementInfo() {
@@ -109,8 +107,23 @@ export default class SelectComponent extends BaseComponent {
     }
   }
 
-  itemValue(data) {
-    return (this.component.valueProperty && _.isObject(data)) ? _.get(data, this.component.valueProperty) : data;
+  /**
+   * @param {*} data
+   * @param {boolean} [forceUseValue=false] - if true, return 'value' property of the data
+   * @return {*}
+   */
+  itemValue(data, forceUseValue = false) {
+    if (_.isObject(data)) {
+      if (this.component.valueProperty) {
+        return _.get(data, this.component.valueProperty);
+      }
+
+      if (forceUseValue) {
+        return data.value;
+      }
+    }
+
+    return data;
   }
 
   createInput(container) {
@@ -246,6 +259,17 @@ export default class SelectComponent extends BaseComponent {
   loadItems(url, search, headers, options, method, body) {
     options = options || {};
 
+    // See if they have not met the minimum search requirements.
+    const minSearch = parseInt(this.component.minSearch, 10);
+    if (
+      this.component.searchField &&
+      (minSearch > 0) &&
+      (!search || (search.length < minSearch))
+    ) {
+      // Set empty items.
+      return this.setItems([]);
+    }
+
     // Ensure we have a method and remove any body if method is get
     method = method || 'GET';
     if (method.toUpperCase() === 'GET') {
@@ -334,14 +358,17 @@ export default class SelectComponent extends BaseComponent {
     }, 'values') || []);
   }
 
+  /* eslint-disable max-statements */
   updateItems(searchInput, forceUpdate) {
     if (!this.component.data) {
       console.warn(`Select component ${this.key} does not have data configuration.`);
+      this.itemsLoadedResolve();
       return;
     }
 
     // Only load the data if it is visible.
     if (!this.checkConditions()) {
+      this.itemsLoadedResolve();
       return;
     }
 
@@ -357,8 +384,8 @@ export default class SelectComponent extends BaseComponent {
         this.updateCustomItems();
         break;
       case 'resource': {
-        if (!forceUpdate && !this.active) {
-          // If we are lazyLoading, wait until activated.
+        // If there is no resource, or we are lazyLoading, wait until active.
+        if (!this.component.data.resource || (!forceUpdate && !this.active)) {
           return;
         }
         let resourceUrl = this.options.formio ? this.options.formio.formsUrl : `${Formio.getProjectUrl()}/form`;
@@ -382,7 +409,11 @@ export default class SelectComponent extends BaseComponent {
         let body;
 
         if (url.substr(0, 1) === '/') {
-          url = Formio.getBaseUrl() + this.component.data.url;
+          let baseUrl = Formio.getProjectUrl();
+          if (!baseUrl) {
+            baseUrl = Formio.getBaseUrl();
+          }
+          url = baseUrl + this.component.data.url;
         }
 
         if (!this.component.data.method) {
@@ -402,6 +433,7 @@ export default class SelectComponent extends BaseComponent {
       }
     }
   }
+  /* eslint-enable max-statements */
 
   addPlaceholder(input) {
     if (!this.component.placeholder || !input) {
@@ -430,7 +462,7 @@ export default class SelectComponent extends BaseComponent {
     else {
       this.addOption('', this.t('loading...'));
     }
-    this.refreshItems();
+    this.triggerUpdate();
   }
 
   get active() {
@@ -440,29 +472,13 @@ export default class SelectComponent extends BaseComponent {
   /* eslint-disable max-statements */
   addInput(input, container) {
     super.addInput(input, container);
-
-    // If they wish to refresh on a value, then add that here.
-    if (this.component.refreshOn) {
-      this.on('change', (event) => {
-        if (this.component.refreshOn === 'data') {
-          this.refreshItems();
-        }
-        else if (
-          event.changed &&
-          event.changed.component &&
-          (event.changed.component.key === this.component.refreshOn)
-        ) {
-          this.refreshItems();
-        }
-      });
-    }
-
     if (this.component.multiple) {
       input.setAttribute('multiple', true);
     }
 
     if (this.component.widget === 'html5') {
       this.triggerUpdate();
+      this.focusableElement = input;
       this.addEventListener(input, 'focus', () => this.update());
       this.addEventListener(input, 'keydown', (event) => {
         const { keyCode } = event;
@@ -477,7 +493,7 @@ export default class SelectComponent extends BaseComponent {
     const useSearch = this.component.hasOwnProperty('searchEnabled') ? this.component.searchEnabled : true;
     const placeholderValue = this.t(this.component.placeholder);
     const choicesOptions = {
-      removeItemButton: _.get(this.component, 'removeItemButton', true),
+      removeItemButton: this.component.disabled ? false : _.get(this.component, 'removeItemButton', true),
       itemSelectText: '',
       classNames: {
         containerOuter: 'choices form-group formio-choices',
@@ -486,7 +502,7 @@ export default class SelectComponent extends BaseComponent {
       addItemText: false,
       placeholder: !!this.component.placeholder,
       placeholderValue: placeholderValue,
-      searchPlaceholderValue: placeholderValue,
+      searchPlaceholderValue: this.t('Type to search'),
       shouldSort: false,
       position: (this.component.dropdown || 'auto'),
       searchEnabled: useSearch,
@@ -511,6 +527,7 @@ export default class SelectComponent extends BaseComponent {
       this.choices.containerOuter.setAttribute('tabIndex', '-1');
       this.addEventListener(this.choices.containerOuter, 'focus', () => this.focusableElement.focus());
     }
+    this.addFocusBlurEvents(this.focusableElement);
     this.focusableElement.setAttribute('tabIndex', tabIndex);
 
     this.setInputStyles(this.choices.containerOuter);
@@ -530,6 +547,14 @@ export default class SelectComponent extends BaseComponent {
     }
 
     this.addEventListener(input, 'showDropdown', () => this.update());
+    if (placeholderValue && this.choices.isSelectOneElement) {
+      this.addEventListener(input, 'removeItem', () => {
+        const items = this.choices.store.getItemsFilteredByActive();
+        if (!items.length) {
+          this.choices._addItem(placeholderValue, placeholderValue, 0, -1, null, true, null);
+        }
+      });
+    }
 
     // Force the disabled state with getters and setters.
     this.disabled = this.disabled;
@@ -565,22 +590,35 @@ export default class SelectComponent extends BaseComponent {
 
   show(show) {
     // If we go from hidden to visible, trigger a refresh.
-    if (show && (this._visible !== show)) {
+    const triggerUpdate = show && (this._visible !== show);
+    show = super.show(show);
+    if (triggerUpdate) {
       this.triggerUpdate();
     }
-    return super.show(show);
+    return show;
   }
 
+  /**
+   * @param {*} value
+   * @param {Array} items
+   */
   addCurrentChoices(value, items) {
     if (value) {
       let found = false;
+      // Make sure that `items` and `this.selectOptions` points
+      // to the same reference. Because `this.selectOptions` is
+      // internal property and all items are populated by
+      // `this.addOption` method, we assume that items has
+      // 'label' and 'value' properties. This assumption allows
+      // us to read correct value from the item.
+      const isSelectOptions = items === this.selectOptions;
       if (items && items.length) {
         _.each(items, (choice) => {
           if (choice._id && value._id && (choice._id === value._id)) {
             found = true;
             return false;
           }
-          found |= _.isEqual(this.itemValue(choice), value);
+          found |= _.isEqual(this.itemValue(choice, isSelectOptions), value);
           return found ? false : true;
         });
       }
@@ -593,7 +631,7 @@ export default class SelectComponent extends BaseComponent {
   }
 
   getView(data) {
-    return this.itemTemplate(data);
+    return this.asString(data);
   }
 
   getValue() {
@@ -622,6 +660,10 @@ export default class SelectComponent extends BaseComponent {
       });
       value = this.component.multiple ? values : values.shift();
     }
+    // Choices will return undefined if nothing is selected. We really want '' to be empty.
+    if (value === undefined || value === null) {
+      value = '';
+    }
     return value;
   }
 
@@ -629,7 +671,7 @@ export default class SelectComponent extends BaseComponent {
     flags = this.getFlags.apply(this, arguments);
     const previousValue = this.dataValue;
     if (this.component.multiple && !Array.isArray(value)) {
-      value = [value];
+      value = value ? [value] : [];
     }
     const hasPreviousValue = Array.isArray(previousValue) ? previousValue.length : previousValue;
     const hasValue = Array.isArray(value) ? value.length : value;
@@ -698,6 +740,16 @@ export default class SelectComponent extends BaseComponent {
 
     this.updateOnChange(flags, changed);
     return changed;
+  }
+
+  /**
+   * Deletes the value of the component.
+   */
+  deleteValue() {
+    this.setValue('', {
+      noUpdateEvent: true
+    });
+    _.unset(this.data, this.key);
   }
 
   /**

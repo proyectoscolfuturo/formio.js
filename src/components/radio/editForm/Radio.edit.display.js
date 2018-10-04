@@ -44,6 +44,8 @@ export default [
         // start
         calculateValue: { var: 'row.label' }
         // end
+
+        allowCalculateOverride: true,
       },
       {
         type: 'select',

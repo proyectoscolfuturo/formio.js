@@ -6,9 +6,7 @@ import Components from '../Components';
 
 export default class NestedComponent extends BaseComponent {
   static schema(...extend) {
-    return BaseComponent.schema({
-      tree: true
-    }, ...extend);
+    return BaseComponent.schema({}, ...extend);
   }
 
   constructor(component, options, data) {
@@ -19,12 +17,14 @@ export default class NestedComponent extends BaseComponent {
     this.collapsed = !!this.component.collapsed;
   }
 
-  build(showLabel) {
+  build(state, showLabel) {
     this.createElement();
     if (showLabel) {
       this.createLabel(this.element);
     }
-    this.addComponents();
+    this.addComponents(null, null, null, state);
+
+    this.attachLogic();
   }
 
   get defaultSchema() {
@@ -40,6 +40,18 @@ export default class NestedComponent extends BaseComponent {
 
   getComponents() {
     return this.components;
+  }
+
+  getAllComponents() {
+    return this.getComponents().reduce((components, component) => {
+      let result = component;
+
+      if (component && component.getAllComponents) {
+        result = component.getAllComponents();
+      }
+
+      return components.concat(result);
+    }, []);
   }
 
   /**
@@ -125,13 +137,13 @@ export default class NestedComponent extends BaseComponent {
    * @param component
    * @param data
    */
-  createComponent(component, options, data, before) {
+  createComponent(component, options, data, before, state) {
     options = options || this.options;
     data = data || this.data;
     const comp = Components.create(component, options, data, true);
     comp.parent = this;
     comp.root = this.root || this;
-    comp.build();
+    comp.build(state);
     comp.isBuilt = true;
     if (component.internal) {
       return comp;
@@ -163,23 +175,30 @@ export default class NestedComponent extends BaseComponent {
    * @param {HTMLElement} element - The DOM element to append this child to.
    * @param {Object} data - The submission data object to house the data for this component.
    * @param {HTMLElement} before - A DOM element to insert this element before.
+   * @param {Boolean} noAdd - If this component should just be created and not added to this nested component.
+   * @param {Object} state - The state of the component getting created.
    * @return {BaseComponent} - The created component instance.
    */
-  addComponent(component, element, data, before, noAdd) {
+  addComponent(component, element, data, before, noAdd, state) {
     element = element || this.getContainer();
     data = data || this.data;
-    const comp = this.createComponent(component, this.options, data, before ? before.component : null);
+    const comp = this.createComponent(component, this.options, data, before ? before.component : null, state);
     if (noAdd) {
       return comp;
     }
-    this.setHidden(comp);
     element = this.hook('addComponent', element, comp, this);
+    const compElement = comp.getElement();
+    if (!compElement) {
+      console.warn(`Component ${component.key} has no element.`);
+      return comp;
+    }
     if (before) {
-      element.insertBefore(comp.getElement(), before);
+      element.insertBefore(compElement, before);
     }
     else {
-      element.appendChild(comp.getElement());
+      element.appendChild(compElement);
     }
+    this.setHidden(comp);
     return comp;
   }
 
@@ -191,12 +210,13 @@ export default class NestedComponent extends BaseComponent {
    */
   removeComponent(component, components) {
     components = components || this.components;
-    component.destroy();
+    const state = component.destroy();
     const element = component.getElement();
     if (element && element.parentNode) {
       this.removeChildFrom(element, element.parentNode);
     }
     _.remove(components, { id: component.id });
+    return state;
   }
 
   /**
@@ -252,19 +272,29 @@ export default class NestedComponent extends BaseComponent {
    * @param element
    * @param data
    */
-  addComponents(element, data) {
+  addComponents(element, data, options, state) {
     element = element || this.getContainer();
     data = data || this.data;
-    const components = this.hook('addComponents', this.componentComponents, this);
-    _.each(components, (component) => this.addComponent(component, element, data));
+    options = options || this.options;
+    state = state || {};
+
+    if (options.components) {
+      this.components = options.components;
+    }
+    else {
+      const components = this.hook('addComponents', this.componentComponents, this) || [];
+      components.forEach((component) => {
+        let compState = {};
+        if (state && state.components && state.components[component.key]) {
+          compState = state.components[component.key];
+        }
+        this.addComponent(component, element, data, null, null, compState);
+      });
+    }
   }
 
   updateValue(flags) {
-    let changed = false;
-    _.each(this.components, (comp) => {
-      changed |= comp.updateValue(flags);
-    });
-    return changed;
+    return this.components.reduce((changed, comp) => comp.updateValue(flags) || changed, false);
   }
 
   hasChanged() {
@@ -291,7 +321,7 @@ export default class NestedComponent extends BaseComponent {
     });
 
     // Iterate through all components and check conditions, and calculate values.
-    _.each(this.getComponents(), (comp) => {
+    this.getComponents().forEach((comp) => {
       changed |= comp.calculateValue(data, {
         noUpdateEvent: true
       });
@@ -311,13 +341,37 @@ export default class NestedComponent extends BaseComponent {
   }
 
   checkConditions(data) {
-    this.getComponents().forEach(comp => comp.checkConditions(data));
+    this.getComponents().forEach((comp) => comp.checkConditions(data));
     return super.checkConditions(data);
   }
 
   clearOnHide(show) {
     super.clearOnHide(show);
-    this.getComponents().forEach(component => component.clearOnHide(show));
+    this.getComponents().forEach((component) => component.clearOnHide(show));
+  }
+
+  show(show) {
+    const shown = super.show(show);
+    const forceShow = this.options.show && this.options.show[this.component.key];
+    const forceHide = this.options.hide && this.options.hide[this.component.key];
+
+    if (forceShow || forceHide) {
+      this.getComponents().forEach((component) => {
+        if (forceShow) {
+          component.show(true);
+        }
+        else if (forceHide) {
+          component.show(false);
+        }
+      });
+    }
+    // If hiding a nested component, clear all errors below.
+    if (!shown) {
+      this.getAllComponents().forEach(component => {
+        component.error = '';
+      });
+    }
+    return shown;
   }
 
   /**
@@ -326,9 +380,7 @@ export default class NestedComponent extends BaseComponent {
    * @return {*}
    */
   beforeNext() {
-    const ops = [];
-    _.each(this.getComponents(), (comp) => ops.push(comp.beforeNext()));
-    return Promise.all(ops);
+    return Promise.all(this.getComponents().map((comp) => comp.beforeNext()));
   }
 
   /**
@@ -337,25 +389,25 @@ export default class NestedComponent extends BaseComponent {
    * @return {*}
    */
   beforeSubmit() {
-    const ops = [];
-    _.each(this.getComponents(), (comp) => ops.push(comp.beforeSubmit()));
-    return Promise.all(ops);
+    return Promise.all(this.getComponents().map((comp) => comp.beforeSubmit()));
   }
 
   calculateValue(data, flags) {
-    let changed = super.calculateValue(data, flags);
-    _.each(this.getComponents(), (comp) => {
-      changed |= comp.calculateValue(data, flags);
-    });
-    return changed;
+    // Do not iterate into children and calculateValues if this nested component is conditionally hidden.
+    if (!this.conditionallyVisible()) {
+      return false;
+    }
+    return this.getComponents().reduce(
+      (changed, comp) => comp.calculateValue(data, flags) || changed,
+      super.calculateValue(data, flags)
+    );
   }
 
   isValid(data, dirty) {
-    let valid = super.isValid(data, dirty);
-    _.each(this.getComponents(), (comp) => {
-      valid &= comp.isValid(data, dirty);
-    });
-    return valid;
+    return this.getComponents().reduce(
+      (valid, comp) => comp.isValid(data, dirty) && valid,
+      super.isValid(data, dirty)
+    );
   }
 
   checkValidity(data, dirty) {
@@ -364,38 +416,45 @@ export default class NestedComponent extends BaseComponent {
       return true;
     }
 
-    let check = super.checkValidity(data, dirty);
-    _.each(this.getComponents(), (comp) => {
-      check &= comp.checkValidity(data, dirty);
-    });
-    return check;
+    return this.getComponents().reduce(
+      (check, comp) => comp.checkValidity(data, dirty) && check,
+      super.checkValidity(data, dirty)
+    );
   }
 
   setPristine(pristine) {
     super.setPristine(pristine);
-    _.each(this.getComponents(), (comp) => (comp.setPristine(pristine)));
+    this.getComponents().forEach((comp) => comp.setPristine(pristine));
   }
 
-  destroy(all) {
-    super.destroy(all);
-    this.empty(this.getElement());
-    this.destroyComponents();
+  /**
+   * Destroys this component.
+   *
+   * @param state
+   */
+  destroy() {
+    const state = super.destroy() || {};
+    this.destroyComponents(state);
+    return state;
   }
 
-  destroyComponents() {
-    const components = _.clone(this.components);
-    _.each(components, (comp) => this.removeComponent(comp, this.components));
+  destroyComponents(state) {
+    state = state || {};
+    state.components = state.components || {};
+    const components = this.components.slice();
+    components.forEach((comp) => {
+      const compState = this.removeComponent(comp, this.components);
+      if (comp.key && compState) {
+        state.components[comp.key] = compState;
+      }
+    });
     this.components = [];
     this.hidden = [];
-  }
-
-  setCustomValidity(message, dirty) {
-    super.setCustomValidity(message, dirty);
-    _.each(this.getComponents(), (comp) => comp.setCustomValidity(message, dirty));
+    return state;
   }
 
   set disabled(disabled) {
-    _.each(this.components, (component) => (component.disabled = disabled));
+    this.components.forEach((component) => component.disabled = disabled);
   }
 
   setHidden(component) {
@@ -404,14 +463,20 @@ export default class NestedComponent extends BaseComponent {
       component.component.hidden = true;
     }
 
-    if (component.components && component.components.length) {
-      component.hideComponents(this.hidden);
-    }
-    else if (component.component.hidden) {
-      component.visible = false;
-    }
-    else {
-      component.visible = (!this.hidden || !this.hidden.includes(component.key));
+    // if (component.components && component.components.length) {
+    //   component.hideComponents(this.hidden);
+    // }
+    // else if (component.component.hidden) {
+    //   component.visible = false;
+    // }
+    // else {
+    //   component.visible = (!this.hidden || !this.hidden.includes(component.key));
+    if (
+      (component.component.hidden) ||
+      (this.hidden && this.hidden.includes(component.key)) ||
+      (!component.conditionallyVisible())
+    ) {
+      component.show(false, true);
     }
   }
 
@@ -421,18 +486,7 @@ export default class NestedComponent extends BaseComponent {
   }
 
   get errors() {
-    let errors = [];
-    _.each(this.getComponents(), (comp) => {
-      const compErrors = comp.errors;
-      if (compErrors.length) {
-        errors = errors.concat(compErrors);
-      }
-    });
-    return errors;
-  }
-
-  get value() {
-    return this.data;
+    return this.getAllComponents().reduce((errors, comp) => errors.concat(comp.errors || []), []);
   }
 
   getValue() {
@@ -440,15 +494,30 @@ export default class NestedComponent extends BaseComponent {
   }
 
   resetValue() {
-    _.each(this.getComponents(), (comp) => (comp.resetValue()));
+    this.getComponents().forEach((comp) => comp.resetValue());
     _.unset(this.data, this.key);
     this.setPristine(true);
   }
 
   get dataReady() {
-    const promises = [];
-    _.each(this.getComponents(), (component) => promises.push(component.dataReady));
-    return Promise.all(promises);
+    return Promise.all(this.getComponents().map((component) => component.dataReady));
+  }
+
+  setNestedValue(component, value, flags, changed) {
+    if (component.type === 'button') {
+      return false;
+    }
+
+    if (component.type === 'components') {
+      return component.setValue(value, flags) || changed;
+    }
+    else if (value && component.hasValue(value)) {
+      return component.setValue(_.get(value, component.key), flags) || changed;
+    }
+    else {
+      flags.noValidate = true;
+      return component.setValue(component.defaultValue, flags) || changed;
+    }
   }
 
   setValue(value, flags) {
@@ -456,24 +525,9 @@ export default class NestedComponent extends BaseComponent {
       return false;
     }
     flags = this.getFlags.apply(this, arguments);
-    let changed = false;
-    this.getComponents().forEach(component => {
-      if (component.type === 'button') {
-        return;
-      }
-
-      if (component.type === 'components') {
-        changed |= component.setValue(value, flags);
-      }
-      else if (value && component.hasValue(value)) {
-        changed |= component.setValue(_.get(value, component.key), flags);
-      }
-      else {
-        flags.noValidate = true;
-        changed |= component.setValue(component.defaultValue, flags);
-      }
-    });
-    return changed;
+    return this.getComponents().reduce((changed, component) => {
+      return this.setNestedValue(component, value, flags, changed);
+    }, false);
   }
 
   setCollapseHeader(header) {
@@ -484,7 +538,7 @@ export default class NestedComponent extends BaseComponent {
   }
 
   setCollapsed(element) {
-    if (!this.component.collapsible) {
+    if (!this.component.collapsible || this.options.builder) {
       return;
     }
 

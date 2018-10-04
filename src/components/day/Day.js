@@ -165,6 +165,7 @@ export default class DayComponent extends BaseComponent {
       id
     });
     this.hook('input', this.dayInput, dayInputWrapper);
+    this.addFocusBlurEvents(this.dayInput);
     this.addEventListener(this.dayInput, 'change', () => this.updateValue());
     dayInputWrapper.appendChild(this.dayInput);
     this.setSubinputStyle(dayInputWrapper);
@@ -206,6 +207,7 @@ export default class DayComponent extends BaseComponent {
       id
     });
     this.hook('input', this.monthInput, monthInputWrapper);
+    this.addFocusBlurEvents(this.monthInput);
     this.selectOptions(this.monthInput, 'monthOption', this.months);
     const self = this;
 
@@ -262,6 +264,7 @@ export default class DayComponent extends BaseComponent {
     });
 
     this.hook('input', this.yearInput, yearInputWrapper);
+    this.addFocusBlurEvents(this.yearInput);
     this.addEventListener(this.yearInput, 'change', () => this.updateValue());
     yearInputWrapper.appendChild(this.yearInput);
     this.setSubinputStyle(yearInputWrapper);
@@ -372,7 +375,9 @@ export default class DayComponent extends BaseComponent {
    * @param value
    */
   setValueAt(index, value) {
-    if (!value) {
+    // temporary solution to avoid input reset
+    // on invalid date.
+    if (!value || value === 'Invalid date') {
       return null;
     }
     const parts = value.split('/');
@@ -416,35 +421,82 @@ export default class DayComponent extends BaseComponent {
    * @returns {Date}
    */
   get date() {
-    if (!this.dayInput && !this.monthInput && !this.yearInput) {
-      if (typeof (this.data) === 'string' && this.data.length > 0) {
-        return moment(this.data, this.format);
-      }
+// <<<<<<< HEAD
+//     if (!this.dayInput && !this.monthInput && !this.yearInput) {
+//       if (typeof (this.data) === 'string' && this.data.length > 0) {
+//         return moment(this.data, this.format);
+//       }
+//     }
+
+//     var day = !this.dayInput || _.isNaN(this.dayInput.value) ? 0 : parseInt(this.dayInput.value, 10);
+//     var month = !this.monthInput || _.isNaN(this.monthInput.value) ? -1 : (parseInt(this.monthInput.value, 10) - 1);
+//     var year = !this.yearInput || _.isNaN(this.yearInput.value) ? 0 : parseInt(this.yearInput.value, 10);
+
+//     if (this.showDay && !day) {
+//       return null;
+//     }
+//     else if (!this.showDay) {
+//       day = 1;
+//     }
+//     if (this.showMonth && (month < 0)) {
+//       return null;
+//     }
+//     else if (!this.showMonth) {
+//       month = 0;
+//     }
+//     if (this.showYear && !year) {
+//       return null;
+//     }
+//     else if (!this.showYear) {
+//       year = 1900;
+//     }
+//     return moment([year, month, day]);
+// =======
+    const options = {};
+    let defaults = [];
+    // Map positions to identifiers
+    const [DAY, MONTH, YEAR] = this.component.dayFirst ? [0, 1, 2] : [1, 0, 2];
+
+    if (this.component.defaultValue) {
+      defaults = this.component.defaultValue
+        .split('/')
+        .map(x => parseInt(x, 10));
     }
 
-    var day = !this.dayInput || _.isNaN(this.dayInput.value) ? 0 : parseInt(this.dayInput.value, 10);
-    var month = !this.monthInput || _.isNaN(this.monthInput.value) ? -1 : (parseInt(this.monthInput.value, 10) - 1);
-    var year = !this.yearInput || _.isNaN(this.yearInput.value) ? 0 : parseInt(this.yearInput.value, 10);
+    const day = this.showDay ? parseInt(this.dayInput.value, 10) : NaN;
 
-    if (this.showDay && !day) {
+    if (!_.isNaN(day)) {
+      options.day = day;
+    }
+    else if (defaults[DAY] && !_.isNaN(defaults[DAY])) {
+      options.day = defaults[DAY];
+    }
+
+    const month = this.showMonth ? parseInt(this.monthInput.value, 10) : NaN;
+
+    if (!_.isNaN(month) && month > 0) {
+      // Months are 0 indexed.
+      options.month = (month - 1);
+    }
+    else if (defaults[MONTH] && !_.isNaN(defaults[MONTH])) {
+      options.month = defaults[MONTH] - 1;
+    }
+
+    const year = this.showYear ? parseInt(this.yearInput.value) : NaN;
+
+    if (!_.isNaN(year)) {
+      options.year = year;
+    }
+    else if (defaults[YEAR] && !_.isNaN(defaults[YEAR])) {
+      options.year = defaults[YEAR];
+    }
+
+    if (_.isEmpty(options)) {
       return null;
     }
-    else if (!this.showDay) {
-      day = 1;
-    }
-    if (this.showMonth && (month < 0)) {
-      return null;
-    }
-    else if (!this.showMonth) {
-      month = 0;
-    }
-    if (this.showYear && !year) {
-      return null;
-    }
-    else if (!this.showYear) {
-      year = 1900;
-    }
-    return moment([year, month, day]);
+
+    return moment(options);
+// >>>>>>> upstream/master
   }
 
   /**

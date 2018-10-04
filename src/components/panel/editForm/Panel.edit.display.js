@@ -1,6 +1,11 @@
 export default [
   {
-    weight: 10,
+    key: 'label',
+    hidden: true,
+    calculateValue: 'value = data.title'
+  },
+  {
+    weight: 1,
     type: 'textfield',
     input: true,
     placeholder: 'Panel Title',
@@ -47,6 +52,25 @@ export default [
         { label: 'Yes', value: 'default' },
         { label: 'No', value: 'none' }
       ]
+    }
+  },
+  {
+    weight: 650,
+    type: 'checkbox',
+    label: 'Collapsible',
+    tooltip: 'If checked, this will turn this Panel into a collapsible panel.',
+    key: 'collapsible',
+    input: true
+  },
+  {
+    weight: 651,
+    type: 'checkbox',
+    label: 'Initially Collapsed',
+    tooltip: 'Determines the initial collapsed state of this Panel.',
+    key: 'collapsed',
+    input: true,
+    conditional: {
+      json: { '===': [{ var: 'data.collapsible' }, true] }
     }
   }
 ];

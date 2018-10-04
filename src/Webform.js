@@ -1,15 +1,12 @@
-// DO NOT DELETE! THIS WILL BREAK PDF GENERATION.
-/* eslint-disable no-unused-vars */
-import * as polyfill from './formio.polyfill';
-/* eslint-enable no-unused-vars */
-
 import _ from 'lodash';
+import moment from 'moment';
 import EventEmitter from 'eventemitter2';
 import i18next from 'i18next';
 import Formio from './Formio';
 import Promise from 'native-promise-only';
 import Components from './components/Components';
 import NestedComponent from './components/nested/NestedComponent';
+import { currentTimezone } from './utils/utils';
 
 // Initialize the available forms.
 Formio.forms = {};
@@ -20,7 +17,8 @@ Formio.registerComponent = Components.setComponent;
 function getOptions(options) {
   options = _.defaults(options, {
     submitOnEnter: false,
-    i18next: i18next
+    icons: Formio.icons || '',
+    i18next,
   });
   if (!options.events) {
     options.events = new EventEmitter({
@@ -68,7 +66,10 @@ export default class Webform extends NestedComponent {
       }
       else {
         _.each(options.i18n, (lang, code) => {
-          if (!i18n.resources[code]) {
+          if (code === 'options') {
+            _.merge(i18n, lang);
+          }
+          else if (!i18n.resources[code]) {
             i18n.resources[code] = { translation: lang };
           }
           else {
@@ -110,11 +111,18 @@ export default class Webform extends NestedComponent {
     this.nosubmit = false;
 
     /**
-     * If the form has tried to be submitted, error or not.
+     * Determines if the form has tried to be submitted, error or not.
      *
      * @type {boolean}
      */
     this.submitted = false;
+
+    /**
+     * Determines if the form is being submitted at the moment.
+     *
+     * @type {boolean}
+     */
+    this.submitting = false;
 
     /**
      * The Formio instance for this form.
@@ -235,13 +243,18 @@ export default class Webform extends NestedComponent {
   set language(lang) {
     return new Promise((resolve, reject) => {
       this.options.language = lang;
-      i18next.changeLanguage(lang, (err) => {
-        if (err) {
-          return reject(err);
-        }
-        this.redraw();
-        resolve();
-      });
+      try {
+        i18next.changeLanguage(lang, (err) => {
+          if (err) {
+            return reject(err);
+          }
+          this.redraw();
+          resolve();
+        });
+      }
+      catch (err) {
+        return reject(err);
+      }
     });
   }
 
@@ -270,13 +283,19 @@ export default class Webform extends NestedComponent {
     }
     i18next.initialized = true;
     return new Promise((resolve, reject) => {
-      i18next.init(this.options.i18n, (err) => {
-        this.options.language = i18next.language;
-        if (err) {
-          return reject(err);
-        }
-        resolve(i18next);
-      });
+      try {
+        i18next.init(this.options.i18n, (err) => {
+          // Get language but remove any ;q=1 that might exist on it.
+          this.options.language = i18next.language.split(';')[0];
+          if (err) {
+            return reject(err);
+          }
+          resolve(i18next);
+        });
+      }
+      catch (err) {
+        return reject(err);
+      }
     });
   }
 
@@ -606,6 +625,13 @@ export default class Webform extends NestedComponent {
 
     // Create the form.
     this._form = form;
+
+    // Allow the form to provide component overrides.
+    if (form && form.settings && form.settings.components) {
+      this.options.components = form.settings.components;
+    }
+
+    this.initialized = false;
     return this.createForm(form).then(() => {
       this.emit('formLoad', form);
       return form;
@@ -701,6 +727,18 @@ export default class Webform extends NestedComponent {
     if (!submission || !submission.data) {
       submission = { data: {} };
     }
+    // Metadata needs to be available before setValue
+    this._submission.metadata = submission.metadata || {};
+
+    // Set the timezone in the options if available.
+    if (
+      !this.options.submissionTimezone &&
+      submission.metadata &&
+      submission.metadata.timezone
+    ) {
+      this.options.submissionTimezone = submission.metadata.timezone;
+    }
+
     const changed = super.setValue(submission.data, flags);
     this.mergeData(this.data, submission.data);
     submission.data = this.data;
@@ -740,6 +778,9 @@ export default class Webform extends NestedComponent {
       this.formReadyResolve();
       this.onFormBuild = null;
       this.setValue(this.submission);
+      if (!this.changing) {
+        this.triggerChange();
+      }
       return form;
     }).catch((err) => {
       console.warn(err);
@@ -753,17 +794,14 @@ export default class Webform extends NestedComponent {
    */
   render() {
     return this.onElement.then(() => {
-      this.clear();
+      const state = this.clear();
       this.showElement(false);
-      this.build();
+      clearTimeout(this.build(state));
       this.isBuilt = true;
-      this.on('resetForm', () => this.resetValue());
-      this.on('deleteSubmission', () => this.deleteSubmission());
-      this.on('refreshData', () => this.updateValue());
-      setTimeout(() => {
-        this.onChange();
-        this.emit('render');
-      }, 1);
+      this.on('resetForm', () => this.resetValue(), true);
+      this.on('deleteSubmission', () => this.deleteSubmission(), true);
+      this.on('refreshData', () => this.updateValue(), true);
+      setTimeout(() => this.emit('render'), 1);
     });
   }
 
@@ -791,7 +829,7 @@ export default class Webform extends NestedComponent {
         this.alert = null;
       }
       catch (err) {
-        // ingore
+        // ignore
       }
     }
     if (message) {
@@ -810,11 +848,16 @@ export default class Webform extends NestedComponent {
   /**
    * Build the form.
    */
-  build() {
-    this.on('submitButton', (options) => this.submit(false, options));
-    this.on('checkValidity', (data) => this.checkValidity(data, true));
-    this.addComponents();
-    this.on('requestUrl', (args) => (this.submitUrl(args.url,args.headers)));
+  build(state) {
+    this.on('submitButton', (options) => this.submit(false, options), true);
+    this.on('checkValidity', (data) => this.checkValidity(data, true), true);
+    this.addComponents(null, null, null, state);
+    this.on('requestUrl', (args) => (this.submitUrl(args.url,args.headers)), true);
+    return setTimeout(() => {
+      this.onChange({
+        noEmit: true
+      });
+    }, 1);
   }
 
   /**
@@ -838,14 +881,12 @@ export default class Webform extends NestedComponent {
       this.setAlert(false);
       return;
     }
-    let message = `<p>${this.t('error')}</p><ul>`;
-    _.each(errors, (err) => {
-      if (err) {
-        const errorMessage = err.message || err;
-        message += `<li><strong>${errorMessage}</strong></li>`;
-      }
-    });
-    message += '</ul>';
+    const message = `
+      <p>${this.t('error')}</p>
+      <ul>
+        ${errors.map((err) => err ? `<li><strong>${err.message || err}</strong></li>` : '').join('')}
+      </ul>
+    `;
     this.setAlert('danger', message);
     if (triggerEvent) {
       this.emit('error', errors);
@@ -862,12 +903,16 @@ export default class Webform extends NestedComponent {
    */
   onSubmit(submission, saved) {
     this.loading = false;
+    this.submitting = false;
     this.setPristine(true);
     this.setValue(submission, {
       noValidate: true,
       noCheck: true
     });
     this.setAlert('success', `<p>${this.t('complete')}</p>`);
+    if (!submission.hasOwnProperty('saved')) {
+      submission.saved = saved;
+    }
     this.emit('submit', submission);
     if (saved) {
       this.emit('submitDone', submission);
@@ -892,6 +937,7 @@ export default class Webform extends NestedComponent {
       }
     }
 
+    this.submitting = false;
     this.setPristine(false);
     return this.showErrors(error, true);
   }
@@ -909,7 +955,15 @@ export default class Webform extends NestedComponent {
     value.isValid = this.checkData(value.data, flags);
     this.showElement(true);
     this.loading = false;
-    this.emit('change', value);
+    if (!flags || !flags.noEmit) {
+      this.emit('change', value);
+    }
+
+    // The form is initialized after the first change event occurs.
+    if (!this.initialized) {
+      this.emit('initialized');
+      this.initialized = true;
+    }
   }
 
   checkData(data, flags) {
@@ -957,6 +1011,19 @@ export default class Webform extends NestedComponent {
       }
 
       const submission = this.submission || {};
+
+      // Add in metadata about client submitting the form
+      submission.metadata = submission.metadata || {};
+      _.defaults(submission.metadata, {
+        timezone: _.get(this, '_submission.metadata.timezone', currentTimezone()),
+        offset: parseInt(_.get(this, '_submission.metadata.offset', moment().utcOffset()), 10),
+        referrer: document.referrer,
+        browserName: navigator.appName,
+        userAgent: navigator.userAgent,
+        pathName: window.location.pathname,
+        onLine: navigator.onLine,
+      });
+
       submission.state = options.state || 'submitted';
       const isDraft = (submission.state === 'draft');
       this.hook('beforeSubmit', submission, (err) => {
@@ -973,13 +1040,23 @@ export default class Webform extends NestedComponent {
         }
 
         this.loading = true;
-        if (this.nosubmit || !this.formio) {
+
+        // Use the form action to submit the form if available.
+        let submitFormio = this.formio;
+        if (this._form && this._form.action) {
+          submitFormio = new Formio(this._form.action, this.formio ? this.formio.options : {});
+        }
+
+        if (this.nosubmit || !submitFormio) {
           return resolve({
             submission: submission,
             saved: false
           });
         }
-        this.formio.saveSubmission(submission).then(result => resolve({
+
+        // If this is an actionUrl, then make sure to save the action and not the submission.
+        const submitMethod = submitFormio.actionUrl ? 'saveAction' : 'saveSubmission';
+        submitFormio[submitMethod](submission).then(result => resolve({
           submission: result,
           saved: true
         })).catch(reject);
@@ -989,9 +1066,10 @@ export default class Webform extends NestedComponent {
 
   executeSubmit(options) {
     this.submitted = true;
+    this.submitting = true;
     return this.submitForm(options)
-      .then(result => this.onSubmit(result.submission, result.saved))
-      .catch(err => Promise.reject(this.onSubmissionError(err)));
+      .then((result) => this.onSubmit(result.submission, result.saved))
+      .catch((err) => Promise.reject(this.onSubmissionError(err)));
   }
 
   /**

@@ -1,10 +1,9 @@
-/* global $ */
-
 import Webform from './Webform';
 import dragula from 'dragula';
+import Tooltip from 'tooltip.js';
 import Components from './components/Components';
 import BuilderUtils from './utils/builder';
-import { getComponent } from './utils/utils';
+import { getComponent, bootstrapVersion } from './utils/utils';
 import EventEmitter from 'eventemitter2';
 import Promise from 'native-promise-only';
 import _ from 'lodash';
@@ -13,7 +12,9 @@ require('./components/builder');
 export default class WebformBuilder extends Webform {
   constructor(element, options) {
     super(element, options);
+
     const self = this;
+    this.builderHeight = 0;
     this.dragContainers = [];
     this.sidebarContainers = [];
     this.updateDraggable = _.debounce(this.refreshDraggable.bind(this), 200);
@@ -44,10 +45,10 @@ export default class WebformBuilder extends Webform {
             type: 'htmlelement',
             internal: true,
             tag: 'div',
-            className: 'alert alert-info',
+            className: 'drag-and-drop-alert alert alert-info',
             attrs: [
               { attr: 'id', value: `${parent.id}-placeholder` },
-              { attr: 'style', value: 'text-align:center; margin-bottom: 0px;' },
+              { attr: 'style', value: 'text-align:center;' },
               { attr: 'role', value: 'alert' }
             ],
             content: 'Drag and Drop a form component'
@@ -65,20 +66,71 @@ export default class WebformBuilder extends Webform {
         // Make sure the component position is relative so the buttons align properly.
         comp.getElement().style.position = 'relative';
 
-        const removeButton = parent.ce('div', {
+        const removeButton = this.ce('div', {
           class: 'btn btn-xxs btn-danger component-settings-button component-settings-button-remove'
-        }, parent.getIcon('remove'));
-        parent.addEventListener(removeButton, 'click', () => self.deleteComponent(comp));
+// <<<<<<< HEAD
+//         }, parent.getIcon('remove'));
+//         parent.addEventListener(removeButton, 'click', () => self.deleteComponent(comp));
 
-        const editButton = parent.ce('div', {
+//         const editButton = parent.ce('div', {
+//           class: 'btn btn-xxs btn-default component-settings-button component-settings-button-edit'
+//         }, parent.getIcon('cog'));
+//         parent.addEventListener(editButton, 'click', () => self.editComponent(comp));
+// =======
+        }, this.getIcon('remove'));
+        this.addEventListener(removeButton, 'click', () => this.deleteComponent(comp));
+        new Tooltip(removeButton, {
+          trigger: 'hover',
+          placement: 'top',
+          title: this.t('Remove')
+        });
+
+        const editButton = this.ce('div', {
           class: 'btn btn-xxs btn-default component-settings-button component-settings-button-edit'
-        }, parent.getIcon('cog'));
-        parent.addEventListener(editButton, 'click', () => self.editComponent(comp));
+        }, this.getIcon('cog'));
+        this.addEventListener(editButton, 'click', () => this.editComponent(comp));
+        new Tooltip(editButton, {
+          trigger: 'hover',
+          placement: 'top',
+          title: this.t('Edit')
+        });
+
+        const copyButton = this.ce('div', {
+          class: 'btn btn-xxs btn-default component-settings-button component-settings-button-copy'
+        }, this.getIcon('copy'));
+        this.addEventListener(copyButton, 'click', () => this.copyComponent(comp));
+        new Tooltip(copyButton, {
+          trigger: 'hover',
+          placement: 'top',
+          title: this.t('Copy')
+        });
+
+        const pasteButton = this.ce('div', {
+          class: 'btn btn-xxs btn-default component-settings-button component-settings-button-paste'
+        }, this.getIcon('save'));
+        const pasteTooltip = new Tooltip(pasteButton, {
+          trigger: 'hover',
+          placement: 'top',
+          title: this.t('Paste below')
+        });
+        this.addEventListener(pasteButton, 'click', () => {
+          pasteTooltip.hide();
+          this.pasteComponent(comp);
+        });
+
+        // Set in paste mode if we have an item in our clipboard.
+        if (window.sessionStorage) {
+          const data = window.sessionStorage.getItem('formio.clipboard');
+          if (data) {
+            this.addClass(this.element, 'builder-paste-mode');
+          }
+        }
+// >>>>>>> upstream/master
 
         // Add the edit buttons to the component.
-        comp.prepend(parent.ce('div', {
+        comp.prepend(this.ce('div', {
           class: 'component-btn-group'
-        }, [removeButton, editButton]));
+        }, [removeButton, copyButton, pasteButton, editButton]));
       }
 
       if (!container.noDrop) {
@@ -115,11 +167,11 @@ export default class WebformBuilder extends Webform {
   scrollSidebar() {
     const newTop = (window.scrollY - this.sideBarTop) + this.options.sideBarScrollOffset;
     const shouldScroll = (newTop > 0);
-    if (shouldScroll && ((newTop + this.sideBarElement.offsetHeight) < this.element.offsetHeight)) {
+    if (shouldScroll && ((newTop + this.sideBarElement.offsetHeight) < this.builderHeight)) {
       this.sideBarElement.style.marginTop = `${newTop}px`;
     }
-    else if (shouldScroll && (this.sideBarElement.offsetHeight < this.element.offsetHeight)) {
-      this.sideBarElement.style.marginTop = `${this.element.offsetHeight - this.sideBarElement.offsetHeight}px`;
+    else if (shouldScroll && (this.sideBarElement.offsetHeight < this.builderHeight)) {
+      this.sideBarElement.style.marginTop = `${this.builderHeight - this.sideBarElement.offsetHeight}px`;
     }
     else {
       this.sideBarElement.style.marginTop = '0px';
@@ -140,6 +192,14 @@ export default class WebformBuilder extends Webform {
 
   get ready() {
     return this.builderReady;
+  }
+
+  setForm(form) {
+    this.emit('change', form);
+    return super.setForm(form).then(retVal => {
+      setTimeout(() => (this.builderHeight = this.element.offsetHeight), 200);
+      return retVal;
+    });
   }
 
   deleteComponent(component) {
@@ -200,7 +260,8 @@ export default class WebformBuilder extends Webform {
         'label',
         'placeholder',
         'tooltip',
-        'validate'
+        'validate',
+        'disabled'
       ]));
     }
 
@@ -273,8 +334,8 @@ export default class WebformBuilder extends Webform {
           }, [
             this.ce('div', {
               class: 'card-header panel-heading'
-            }, this.ce('h3', {
-              class: 'card-title panel-title'
+            }, this.ce('h4', {
+              class: 'card-title panel-title mb-0'
             }, this.t('Preview'))),
             this.ce('div', {
               class: 'card-body panel-body'
@@ -294,7 +355,11 @@ export default class WebformBuilder extends Webform {
     // Append the settings page to the dialog body.
     this.dialog.body.appendChild(componentEdit);
 
-    const editForm = Components.components[componentCopy.component.type].editForm();
+    // Allow editForm overrides per component.
+    const overrides = _.get(this.options, `editForm.${componentCopy.component.type}`, {});
+
+    // Get the editform for this component.
+    const editForm = Components.components[componentCopy.component.type].editForm(overrides);
 
     // Change the defaultValue component to be reflective.
     this.defaultValueComponent = getComponent(editForm.components, 'defaultValue');
@@ -303,7 +368,8 @@ export default class WebformBuilder extends Webform {
       'label',
       'placeholder',
       'tooltip',
-      'validate'
+      'validate',
+      'disabled'
     ]));
 
     // Create the form instance.
@@ -314,6 +380,7 @@ export default class WebformBuilder extends Webform {
 
     // Pass along the form being edited.
     this.editForm.editForm = this._form;
+    this.editForm.editComponent = component;
 
     // Update the preview with this component.
     this.updateComponent(componentCopy);
@@ -335,9 +402,7 @@ export default class WebformBuilder extends Webform {
     });
 
     // Modify the component information in the edit form.
-    this.editForm.formReady.then(() => this.editForm.setValue({ data: componentCopy.component }, {
-      noUpdateEvent: true
-    }));
+    this.editForm.formReady.then(() => this.editForm.setValue({ data: componentCopy.component }));
 
     this.addEventListener(cancelButton, 'click', (event) => {
       event.preventDefault();
@@ -352,6 +417,9 @@ export default class WebformBuilder extends Webform {
     });
 
     this.addEventListener(saveButton, 'click', (event) => {
+      if (!this.editForm.checkValidity(this.editForm.data, true)) {
+        return;
+      }
       event.preventDefault();
       component.isNew = false;
       component.component = componentCopy.component;
@@ -365,6 +433,7 @@ export default class WebformBuilder extends Webform {
 
     this.addEventListener(this.dialog, 'close', () => {
       this.editForm.destroy();
+      this.preview.destroy();
       if (component.isNew) {
         this.deleteComponent(component);
       }
@@ -374,11 +443,46 @@ export default class WebformBuilder extends Webform {
     this.emit('editComponent', component);
   }
 
+  /**
+   * Creates copy of component schema and stores it under sessionStorage.
+   * @param {Component} component
+   * @return {*}
+   */
+  copyComponent(component) {
+    if (!window.sessionStorage) {
+      return console.log('Session storage is not supported in this browser.');
+    }
+    this.addClass(this.element, 'builder-paste-mode');
+    const copy = _.cloneDeep(component.schema);
+    window.sessionStorage.setItem('formio.clipboard', JSON.stringify(copy));
+  }
+
+  /**
+   * Paste copied component after the current component.
+   * @param {Component} component
+   * @return {*}
+   */
+  pasteComponent(component) {
+    if (!window.sessionStorage) {
+      return console.log('Session storage is not supported in this browser.');
+    }
+    this.removeClass(this.element, 'builder-paste-mode');
+    const data = window.sessionStorage.getItem('formio.clipboard');
+    if (data) {
+      const schema = JSON.parse(data);
+      window.sessionStorage.removeItem('formio.clipboard');
+      BuilderUtils.uniquify(this._form, schema);
+      component.parent.addComponent(schema, false, false, component.element.nextSibling);
+      this.form = this.schema;
+    }
+  }
+
   destroy() {
-    super.destroy();
+    const state = super.destroy();
     if (this.dragula) {
       this.dragula.destroy();
     }
+    return state;
   }
 
   /**
@@ -431,11 +535,8 @@ export default class WebformBuilder extends Webform {
       'data-target': `#group-${info.key}`
     }, this.text(info.title));
 
-    // See if we have bootstrap.js installed.
-    const hasBootstrapJS = (typeof $ === 'function') && (typeof $().collapse === 'function');
-
     // Add a listener when it is clicked.
-    if (!hasBootstrapJS) {
+    if (!bootstrapVersion()) {
       this.addEventListener(groupAnchor, 'click', (event) => {
         event.preventDefault();
         const clickedGroupId = event.target.getAttribute('data-target').replace('#group-', '');
@@ -461,7 +562,7 @@ export default class WebformBuilder extends Webform {
           this.element.style.minHeight = `${this.builderSidebar.offsetHeight}px`;
           this.scrollSidebar();
         }
-      });
+      }, true);
     }
 
     info.element = this.ce('div', {
@@ -486,14 +587,22 @@ export default class WebformBuilder extends Webform {
 
     let groupBodyClass = 'panel-collapse collapse';
     if (info.default) {
-      groupBodyClass += ' in';
-      if (!hasBootstrapJS) {
-        groupBodyClass += ' show';
+      switch (bootstrapVersion()) {
+        case 4:
+          groupBodyClass += ' show';
+          break;
+        case 3:
+          groupBodyClass += ' in';
+          break;
+        default:
+          groupBodyClass += ' in show';
+          break;
       }
     }
 
     info.panel = this.ce('div', {
       class: groupBodyClass,
+      'data-parent': `#${container.id}`,
       id: `group-${info.key}`
     }, info.body);
 
@@ -553,12 +662,26 @@ export default class WebformBuilder extends Webform {
     return component;
   }
 
+  addBuilderButton(info, container) {
+    info.element = this.ce('div', {
+        style: 'margin: 5px 0;'
+      },
+      this.ce('span', {
+        class: `btn btn-block ${info.style || 'btn-default'}`,
+        onClick: () => this.emit(info.event)
+      }, info.title)
+    );
+    this.groups[info.key] = info;
+    this.insertInOrder(info, this.groups, info.element, container);
+  }
+
   buildSidebar() {
+    // Do not rebuild the sidebar.
+    if (this.sideBarElement) {
+      return;
+    }
     this.groups = {};
     this.sidebarContainers = [];
-    if (this.sideBarElement) {
-      this.removeChildFrom(this.sideBarElement, this.builderSidebar);
-    }
     this.sideBarElement = this.ce('div', {
       id: `builder-sidebar-${this.id}`,
       class: 'accordion panel-group'
@@ -568,7 +691,12 @@ export default class WebformBuilder extends Webform {
     _.each(this.options.builder, (info, group) => {
       if (info) {
         info.key = group;
-        this.addBuilderGroup(info, this.sideBarElement);
+        if (info.type === 'button') {
+          this.addBuilderButton(info, this.sideBarElement);
+        }
+        else {
+          this.addBuilderGroup(info, this.sideBarElement);
+        }
       }
     });
 
@@ -604,7 +732,7 @@ export default class WebformBuilder extends Webform {
     this.updateDraggable();
     this.sideBarTop = this.sideBarElement.getBoundingClientRect().top + window.scrollY;
     if (this.options.sideBarScroll) {
-      this.addEventListener(window, 'scroll', _.throttle(this.scrollSidebar.bind(this), 10));
+      this.addEventListener(window, 'scroll', _.throttle(this.scrollSidebar.bind(this), 10), true);
     }
   }
 
@@ -631,8 +759,8 @@ export default class WebformBuilder extends Webform {
   }
 
   clear() {
-    super.clear();
     this.dragContainers = [];
+    return super.clear();
   }
 
   addComponentTo(parent, schema, element, sibling) {
@@ -644,7 +772,12 @@ export default class WebformBuilder extends Webform {
     );
   }
 
+  /* eslint-disable  max-statements */
   onDrop(element, target, source, sibling) {
+    if (!element || !element.id) {
+      console.warn('No element.id defined for dropping');
+      return;
+    }
     const builderElement = source.querySelector(`#${element.id}`);
     const newParent = this.getParentElement(element);
     if (!newParent || !newParent.component) {
@@ -652,8 +785,9 @@ export default class WebformBuilder extends Webform {
     }
 
     // Remove any instances of the placeholder.
-    const placeholder = document.getElementById(`${newParent.component.id}-placeholder`);
+    let placeholder = document.getElementById(`${newParent.component.id}-placeholder`);
     if (placeholder) {
+      placeholder = placeholder.parentNode;
       placeholder.parentNode.removeChild(placeholder);
     }
 
@@ -723,6 +857,7 @@ export default class WebformBuilder extends Webform {
       this.form = this.schema;
     }
   }
+  /* eslint-enable  max-statements */
 
   /**
    * Adds a submit button if there are no components.
@@ -747,6 +882,9 @@ export default class WebformBuilder extends Webform {
       this.dragula.destroy();
     }
     this.dragula = dragula(this.sidebarContainers.concat(this.dragContainers), {
+      moves(el) {
+        return !el.classList.contains('no-drag');
+      },
       copy(el) {
         return el.classList.contains('drag-copy');
       },
@@ -760,9 +898,9 @@ export default class WebformBuilder extends Webform {
     this.builderReadyResolve();
   }
 
-  build() {
+  build(state) {
     this.buildSidebar();
-    super.build();
+    super.build(state);
     this.updateDraggable();
     this.formReadyResolve();
   }
