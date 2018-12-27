@@ -48,9 +48,6 @@ export default class SelectComponent extends BaseComponent {
     // Keep track of the select options.
     this.selectOptions = [];
 
-    // See if this should use the template.
-    this.useTemplate = (this.component.dataSrc !== 'values') && this.component.template;
-
     // If this component has been activated.
     this.activated = false;
 
@@ -89,7 +86,7 @@ export default class SelectComponent extends BaseComponent {
     }
 
     // Perform a fast interpretation if we should not use the template.
-    if (data && !this.useTemplate) {
+    if (data && !this.component.template) {
       const itemLabel = data.label || data;
       return (typeof itemLabel === 'string') ? this.t(itemLabel) : itemLabel;
     }
@@ -428,7 +425,8 @@ export default class SelectComponent extends BaseComponent {
             body = null;
           }
         }
-        this.loadItems(url, searchInput, this.requestHeaders, { noToken: true }, method, body);
+        const query = this.component.authenticate ? {} : { noToken: true };
+        this.loadItems(url, searchInput, this.requestHeaders, query, method, body);
         break;
       }
     }
@@ -502,6 +500,8 @@ export default class SelectComponent extends BaseComponent {
       addItemText: false,
       placeholder: !!this.component.placeholder,
       placeholderValue: placeholderValue,
+      noResultsText: this.t('No results found'),
+      noChoicesText: this.t('No choices to choose from'),
       searchPlaceholderValue: this.t('Type to search'),
       shouldSort: false,
       position: (this.component.dropdown || 'auto'),
@@ -517,6 +517,7 @@ export default class SelectComponent extends BaseComponent {
 
     const tabIndex = input.tabIndex;
     this.addPlaceholder(input);
+    input.setAttribute('dir', this.i18next.dir());
     this.choices = new Choices(input, choicesOptions);
 
     if (this.component.multiple) {
@@ -525,7 +526,9 @@ export default class SelectComponent extends BaseComponent {
     else {
       this.focusableElement = this.choices.containerInner;
       this.choices.containerOuter.setAttribute('tabIndex', '-1');
-      this.addEventListener(this.choices.containerOuter, 'focus', () => this.focusableElement.focus());
+      if (useSearch) {
+        this.addEventListener(this.choices.containerOuter, 'focus', () => this.focusableElement.focus());
+      }
     }
     this.addFocusBlurEvents(this.focusableElement);
     this.focusableElement.setAttribute('tabIndex', tabIndex);
@@ -631,7 +634,9 @@ export default class SelectComponent extends BaseComponent {
   }
 
   getView(data) {
-    return this.asString(data);
+    return (this.component.multiple && Array.isArray(data))
+      ? data.map(this.asString.bind(this)).join(', ')
+      : this.asString(data);
   }
 
   getValue() {
@@ -665,6 +670,11 @@ export default class SelectComponent extends BaseComponent {
       value = '';
     }
     return value;
+  }
+
+  redraw() {
+    super.redraw();
+    this.triggerUpdate();
   }
 
   setValue(value, flags) {
@@ -770,11 +780,19 @@ export default class SelectComponent extends BaseComponent {
     value = value || this.getValue();
 
     if (this.component.dataSrc === 'values') {
-      value = _.find(this.component.data.values, ['value', value]);
+      value = this.component.multiple
+        ? _.filter(this.component.data.values, item => value.indexOf(item.value) !== -1)
+        :_.find(this.component.data.values, ['value', value]);
     }
 
     if (_.isString(value)) {
       return value;
+    }
+
+    if (Array.isArray(value)) {
+      const items = [];
+      value.forEach(item => items.push(this.itemTemplate(item)));
+      return items.length > 0 ? items.join('<br />') : '-';
     }
 
     return _.isObject(value)

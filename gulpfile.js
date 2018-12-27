@@ -120,10 +120,14 @@ gulp.task('dist', () => gulp.src(['dist/**/*.*']).pipe(gulp.dest('lib/dist')));
 // Watch for changes.
 gulp.task('watch', () => gulp.watch(['./src/**.js', './src/*/**.js'], ['formio.full.js']));
 
+// Copy over the moment-timezones to the resource folder.
+gulp.task('timezones', () => gulp.src('./node_modules/moment-timezone/data/packed/latest.json').pipe(gulp.dest('./resources')));
+
 // Create a new build.
 gulp.task('build', sync.sync([['clean'], 'babel', 'package-version', [
   'icons',
   'jquery',
+  'timezones',
   'fontawesome',
   'bootstrap',
   'bootswatch',

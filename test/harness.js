@@ -162,8 +162,9 @@ const Harness = {
     return element;
   },
   testSetGet(component, value) {
+    const originValue = _.cloneDeep(value);
     component.setValue(value);
-    assert.deepEqual(component.getValue(), value);
+    assert.deepEqual(component.getValue(), originValue);
     return component;
   },
   setInputValue(component, name, value) {
@@ -253,6 +254,13 @@ const Harness = {
       form.on('nextPage', onNextPage);
     }
     return form.nextPage();
+  },
+  testNumberBlur(cmp, inv, outv, display, index = 0) {
+    const input = _.get(cmp, ['inputs', index], {});
+    input.value = inv;
+    input.dispatchEvent(new Event('blur'));
+    assert.strictEqual(cmp.getValueAt(index), outv);
+    assert.strictEqual(input.value, display);
   }
 };
 export default Harness;

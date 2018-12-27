@@ -1,4 +1,4 @@
-/* globals Quill */
+/* globals Quill, ClassicEditor */
 import { conformToMask } from 'vanilla-text-mask';
 import Promise from 'native-promise-only';
 import _ from 'lodash';
@@ -8,6 +8,7 @@ import Formio from '../../Formio';
 import Validator from '../Validator';
 import Widgets from '../../widgets';
 import Component from '../../Component';
+const CKEDITOR = 'https://cdn.staticaly.com/gh/formio/ckeditor5-build-classic/master/build/ckeditor.js';
 
 /**
  * This is the BaseComponent class which all elements within the FormioForm derive from.
@@ -272,6 +273,7 @@ export default class BaseComponent extends Component {
      * Determines if this component is visible, or not.
      */
     this._visible = true;
+    this._parentVisible = true;
 
     /**
      * If this input has been input and provided value.
@@ -306,13 +308,24 @@ export default class BaseComponent extends Component {
      * Used to trigger a new change in this component.
      * @type {function} - Call to trigger a change in this component.
      */
+    let lastChanged = null;
     const _triggerChange = _.debounce((...args) => {
       if (this.root) {
         this.root.changing = false;
       }
+      if (!args[1] && lastChanged) {
+        // Set the changed component if one isn't provided.
+        args[1] = lastChanged;
+      }
+      lastChanged = null;
       return this.onChange(...args);
     }, 100);
     this.triggerChange = (...args) => {
+      if (args[1]) {
+        // Make sure that during the debounce that we always track lastChanged component, even if they
+        // don't provide one later.
+        lastChanged = args[1];
+      }
       if (this.root) {
         this.root.changing = true;
       }
@@ -411,7 +424,7 @@ export default class BaseComponent extends Component {
    */
   t(text, params) {
     params = params || {};
-    params.data = this.root ? this.root.data : this.data;
+    params.data = this.rootValue;
     params.row = this.data;
     params.component = this.component;
     return super.t(text, params);
@@ -465,6 +478,16 @@ export default class BaseComponent extends Component {
    */
   beforeSubmit() {
     return Promise.resolve(true);
+  }
+
+  /**
+   * Return the submission timezone.
+   *
+   * @return {*}
+   */
+  get submissionTimezone() {
+    this.options.submissionTimezone = this.options.submissionTimezone || _.get(this.root, 'options.submissionTimezone');
+    return this.options.submissionTimezone;
   }
 
   get shouldDisable() {
@@ -755,10 +778,11 @@ export default class BaseComponent extends Component {
 
   evalContext(additional) {
     return super.evalContext(Object.assign({
+      instance: this,
       component: this.component,
       row: this.data,
       rowIndex: this.rowIndex,
-      data: (this.root ? this.root.data : this.data),
+      data: this.rootValue,
       submission: (this.root ? this.root._submission : {}),
       form: this.root ? this.root._form : {}
     }, additional));
@@ -832,7 +856,7 @@ export default class BaseComponent extends Component {
   addValue() {
     this.addNewValue();
     this.buildRows();
-    this.checkConditions(this.root ? this.root.data : this.data);
+    this.checkConditions();
     this.restoreValue();
     if (this.root) {
       this.root.onChange();
@@ -920,7 +944,8 @@ export default class BaseComponent extends Component {
     }
     else {
       addButton.appendChild(addIcon);
-      addButton.appendChild(this.text(this.component.addAnother || ' Add Another'));
+      addButton.appendChild(this.text(' '));
+      addButton.appendChild(this.text(this.component.addAnother || 'Add Another'));
       return addButton;
     }
   }
@@ -1178,7 +1203,7 @@ export default class BaseComponent extends Component {
       trigger: 'hover click',
       placement: 'right',
       html: true,
-      title: component.tooltip.replace(/(?:\r\n|\r|\n)/g, '<br />')
+      title: this.interpolate(component.tooltip).replace(/(?:\r\n|\r|\n)/g, '<br />')
     });
   }
 
@@ -1389,21 +1414,26 @@ export default class BaseComponent extends Component {
    * @return {HTMLElement} - The created element.
    */
   renderTemplate(template, data, actions = []) {
-    // Create a container div.
-    const div = this.ce('div');
+    return this.renderTemplateToElement(this.ce('div'), template, data, actions);
+  }
 
-    // Interpolate the template and populate
-    div.innerHTML = this.interpolate(template, data);
+  renderElement(template, data, actions = []) {
+    return this.renderTemplate(template, data, actions).firstChild;
+  }
 
-    // Add actions to matching elements.
-    actions.forEach(action => {
-      const elements = div.getElementsByClassName(action.class);
-      Array.prototype.forEach.call(elements, element => {
+  renderTemplateToElement(element, template, data, actions = []) {
+    element.innerHTML = this.interpolate(template, data).trim();
+    this.attachActions(element, actions);
+    return element;
+  }
+
+  attachActions(element, actions) {
+    actions.forEach((action) => {
+      const elements = element.getElementsByClassName(action.class);
+      Array.prototype.forEach.call(elements, (element) => {
         element.addEventListener(action.event, action.action);
       });
     });
-
-    return div;
   }
 
   /**
@@ -1427,16 +1457,26 @@ export default class BaseComponent extends Component {
    * @return {boolean}
    */
   conditionallyVisible(data) {
+    data = data || this.rootValue;
     if (this.options.builder || !this.hasCondition()) {
       return true;
     }
-    if (!data) {
-      data = this.root ? this.root.data : {};
-    }
+    return this.checkCondition(null, data);
+  }
+
+  /**
+   * Checks the condition of this component.
+   *
+   * @param row - The row contextual data.
+   * @param data - The global data object.
+   *
+   * @return {boolean} - True if the condition applies to this component.
+   */
+  checkCondition(row, data) {
     return FormioUtils.checkCondition(
       this.component,
-      this.data,
-      data,
+      row || this.data,
+      data || this.rootValue,
       this.root ? this.root._form : {},
       this
     );
@@ -1446,11 +1486,11 @@ export default class BaseComponent extends Component {
    * Check for conditionals and hide/show the element based on those conditions.
    */
   checkConditions(data) {
-    data = data || (this.root ? this.root.data: {});
+    data = data || this.rootValue;
 
     // Check advanced conditions
     const result = this.show(this.conditionallyVisible(data));
-    if (this.fieldLogic(data)) {
+    if (!this.options.builder && this.fieldLogic(data)) {
       this.redraw();
     }
 
@@ -1467,6 +1507,7 @@ export default class BaseComponent extends Component {
    * @param data
    */
   fieldLogic(data) {
+    data = data || this.rootValue;
     const logics = this.logic;
 
     // If there aren't logic, don't go further.
@@ -1612,7 +1653,7 @@ export default class BaseComponent extends Component {
       return show;
     }
 
-    this._visible = show;
+    this.visible = show;
     this.showElement(show && !this.component.hidden);
     if (!noClear) {
       this.clearOnHide(show);
@@ -1663,11 +1704,21 @@ export default class BaseComponent extends Component {
   }
 
   set visible(visible) {
-    this.show(visible);
+    this._visible = visible;
   }
 
   get visible() {
-    return this._visible;
+    return this._visible && this._parentVisible;
+  }
+
+  set parentVisible(value) {
+    if (this._parentVisible !== value) {
+      this._parentVisible = value;
+    }
+  }
+
+  get parentVisible() {
+    return this._parentVisible;
   }
 
   onChange(flags, fromRoot) {
@@ -1786,6 +1837,9 @@ export default class BaseComponent extends Component {
       theme: 'snow',
       placeholder: this.t(this.component.placeholder),
       modules: {
+        clipboard: {
+          matchVisual: false
+        },
         toolbar: [
           [{ 'size': ['small', false, 'large', 'huge'] }],  // custom dropdown
           [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
@@ -1798,6 +1852,20 @@ export default class BaseComponent extends Component {
         ]
       }
     };
+  }
+
+  addCKE(element, settings, onChange) {
+    settings = _.isEmpty(settings) ? null : settings;
+    return Formio.requireLibrary('ckeditor', 'ClassicEditor', CKEDITOR, true)
+      .then(() => {
+        if (!element.parentNode) {
+          return Promise.reject();
+        }
+        return ClassicEditor.create(element, settings).then(editor => {
+          editor.model.document.on('change', () => onChange(editor.data.get()));
+          return editor;
+        });
+      });
   }
 
   addQuill(element, settings, onChange) {
@@ -1877,6 +1945,15 @@ export default class BaseComponent extends Component {
   }
 
   /**
+   * Get the data value at the root level.
+   *
+   * @return {*}
+   */
+  get rootValue() {
+    return this.root ? this.root.data : this.data;
+  }
+
+  /**
    * Get the static value of this component.
    * @return {*}
    */
@@ -1928,7 +2005,8 @@ export default class BaseComponent extends Component {
    */
   deleteValue() {
     this.setValue(null, {
-      noUpdateEvent: true
+      noUpdateEvent: true,
+      noDefault: true
     });
     _.unset(this.data, this.key);
   }
@@ -2013,7 +2091,13 @@ export default class BaseComponent extends Component {
     }
 
     flags = flags || {};
-    const newValue = value === undefined || value === null ? this.getValue(flags) : value;
+    let newValue = value;
+    if (!this.visible && this.component.clearOnHide) {
+      newValue = this.dataValue;
+    }
+    else if (value === undefined || value === null) {
+      newValue = this.getValue(flags);
+    }
     const changed = (newValue !== undefined) ? this.hasChanged(newValue, this.dataValue) : false;
     this.dataValue = newValue;
     if (this.viewOnly) {
@@ -2024,18 +2108,22 @@ export default class BaseComponent extends Component {
     return changed;
   }
 
+  get hasSetValue() {
+    return this.hasValue() && !this.isEmpty(this.dataValue);
+  }
+
   /**
    * Restore the value of a control.
    */
   restoreValue() {
-    if (this.hasValue() && !this.isEmpty(this.dataValue)) {
+    if (this.hasSetValue) {
       this.setValue(this.dataValue, {
         noUpdateEvent: true
       });
     }
     else {
       const defaultValue = this.defaultValue;
-      if (defaultValue) {
+      if (!_.isNil(defaultValue)) {
         this.setValue(defaultValue, {
           noUpdateEvent: true
         });
@@ -2142,13 +2230,7 @@ export default class BaseComponent extends Component {
    */
   invalidMessage(data, dirty, ignoreCondition) {
     // Force valid if component is conditionally hidden.
-    if (!ignoreCondition && !FormioUtils.checkCondition(
-      this.component,
-      data,
-      this.data,
-      this.root ? this.root._form : {},
-      this
-    )) {
+    if (!ignoreCondition && !this.checkCondition(null, data)) {
       return '';
     }
 
@@ -2176,9 +2258,9 @@ export default class BaseComponent extends Component {
     return !this.invalidMessage(data, dirty);
   }
 
-  checkValidity(data, dirty) {
+  checkValidity(data, dirty, rowData) {
     // Force valid if component is conditionally hidden.
-    if (!FormioUtils.checkCondition(this.component, data, this.data, this.root ? this.root._form : {}, this)) {
+    if (!this.checkCondition(rowData, data)) {
       this.setCustomValidity('');
       return true;
     }
@@ -2257,8 +2339,9 @@ export default class BaseComponent extends Component {
    * @param index
    * @param value
    */
-  setValueAt(index, value) {
-    if (value === null || value === undefined) {
+  setValueAt(index, value, flags) {
+    flags = flags || {};
+    if (!flags.noDefault && (value === null || value === undefined)) {
       value = this.defaultValue;
     }
     const input = this.performInputMapping(this.inputs[index]);
@@ -2331,7 +2414,7 @@ export default class BaseComponent extends Component {
     const isArray = Array.isArray(value);
     for (const i in this.inputs) {
       if (this.inputs.hasOwnProperty(i)) {
-        this.setValueAt(i, isArray ? value[i] : value);
+        this.setValueAt(i, isArray ? value[i] : value, flags);
       }
     }
     return this.updateValue(flags);
@@ -2368,7 +2451,7 @@ export default class BaseComponent extends Component {
    */
   set disabled(disabled) {
     // Do not allow a component to be disabled if it should be always...
-    if (!disabled && this.shouldDisable) {
+    if ((!disabled && this.shouldDisable) || (disabled && !this.shouldDisable)) {
       return;
     }
 

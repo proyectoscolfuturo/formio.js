@@ -4,6 +4,189 @@ All notable changes to this project will be documented in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 3.10.1
+### Fixed
+ - FOR-1964: Fix bug with delimiter setting in Number
+ - Problems where the valueProperty would not show in the Select component settings.
+ 
+### Changed
+ - Switch to Karma mocha reporter.
+ - Upgraded i18next@13.0.1, @babel/cli@7.2.3, @babel/preset-env@7.2.3, webpack@4.28.2, @babel/polyfill@7.2.5, bootstrap@4.2.1, eslint@5.11.0
+
+## 3.10.0
+### Fixed
+ - Signature field has invalid height attribute of "150" instead of "150px"
+ - Fixed some potential crashes within the EditGrid component.
+ - The form component in builder mode.
+ - The form component "form" selection configuration to work within the form manager application.
+ - The "authenticate" parameter to work with Select components, where it will pass Form.io authentication to the URL.
+ - Fixed view for select multiple
+ - A crash in the isEmpty method for DateTime component.
+ - Fix bug with editForm Data tab for container components
+ - Fix issue where if radio value is true it won't have radio-selected class set on it.
+
+### Added
+ - Tree Component for building nested tree-based controls.
+ - FOR-1948: editorReady promise for Content component
+ - Interpolate to the Button urls so that {{ }} can be used.
+ - FOR-1912: Added tests to the Select component to demonstrate no-reproducibility of this issue.
+ - Ability to flatten wizard and tab components for better printing capability.
+ - Currency Component: Support other currencies - Add suffix / prefix options
+ - Allow translating other Choice.js labels.
+
+## 3.9.4
+### Fixed
+ - Problem where a component can get in an infinite loop if its parent is not visible but it is visible and cleanOnHide is set.
+ - FOR-1759: Default Values doesn't include required decimals
+ - FOR-1911: Problem where some configurations would not get passed to the wizard components.
+ - FOR-1336: Fix bug with double validation
+ - Typos
+ 
+### Added
+ - Add ability to get all translatable strings from a form definition.
+ - RTL support for select dropdowns.
+ - Added component tooltip interpolation
+ 
+
+## 3.9.3
+### Fixed
+ - Problem where wizards with panels with the same key would end up getting caught in infinite refresh loop.
+ - Fix single file types still staying hidden.
+ - Typos
+ - Fix bug with number#getView when value equals to 0
+
+### Changed
+ - Upgraded chance@1.0.18, hoek@6.1.2, karma@3.1.3, @babel/cli@7.2.0, @babel/core@7.2.0, @babel/plugin-proposal-export-default-from@7.2.0, @babel/plugin-proposal-optional-chaining@7.2.0, @babel/preset-env@7.2.0, webpack@4.27.1, webpack-stream@5.2.1
+
+## 3.9.2
+### Fixed
+ - File type settings
+
+## 3.9.1
+### Fixed
+ - More issues with infinite onChange events getting called.
+ - Language is lost when WebForm is created
+ - Some style issues for RTL forms.
+ - Text to remove superfluous spaces
+
+### Added
+ - FOR-1736: Custom component to core builder
+ - Added field for component custom validation
+
+### Changed
+ - Upgraded webpack@4.26.1, i18next@12.1.0, hoek@6.1.0
+
+## 3.9.0
+### Added
+ - FOR-1787: Ability to save Day component with empty day / month / year, added trailing zeros to saved value
+ - Added File types
+
+### Fixed
+ - FOR-1850: Wrong key for Encrypted setting in builder
+ - FOR-1847: Renderer crashing when TextArea is rendered in readOnly and viewAsHtml mode
+ - FOR-1779: Fixed issues with multiple errors showing up on wizards.
+ - Possibility to hide PDF submit button.
+
+## 3.8.0
+### Added
+ - Added the CKEditor WYSIWYG available for textarea editors.
+ - FOR-1758: Allow for another option of persistence called "client-only" which won't send the data to the server.
+
+### Changed
+ - Changed the Content building to use CKEditor.
+
+### Fixed
+ - FOR-1845: Builder buttons missing for components with Logic
+ - Hide "edit" and "delete" on readOnly for EditGrid
+ - Button was disabled while it shouldn't be for Read Only forms, or when configured to always be enabled.
+
+## 3.7.0
+### Changed
+ - Added the 'hideOnChildrenHidden' parameter for Columns to hide when their children are hidden.
+
+### Added
+ - FOR-1806: languageChanged event
+ - FOR-1844: Support for private file downloads with the URL file configuration. Also added a File Upload server @ https://github.com/formio/formio-upload that supports this feature.
+
+### Fixed
+ - FOR-1595: Placement of description for Edit Grid
+ - FOR-1657: Select component Values template.
+ - Fix bug with widget field being displayed on TextArea and Password
+ - FOR-1816: DateTime -> Unchecking '12 Hour Time (AM/PM)' checkbox not changing date format automatically
+ - FOR-1815: Time component for Safari
+ - FOR-1688, FOR-1508: Tabs component issues when building.
+ - FOR-1398: Make columns component adjust on each render
+
+## 3.6.13
+### Fixed
+ - FOR-1821: Number component min and max validation.
+ - FOR-1731: Fix bug with Content component in Wizard builder.
+ - FOR-1728: Fixed more issues around text masks and iOS browsers.
+ - FOR-1646: Blur events are forcing the select dropdowns to close.
+ - FOR-1647: Checkboxes are not getting set in the correct default states.
+
+### Changed
+ - Upgraded moment-timezone@0.5.23
+
+## 3.6.12
+### Fixed
+ - FOR-1745: Children components context for Container, DataGrid and EditGrid component.
+ - Make sidebar buttons work after adding component.
+
+### Added
+ - FOR-1757: Content property to HTML and Content components Logic.
+
+### Changed
+ - Upgraded webpack@4.23.1, eslint@5.8.0, i18next@12.0.0
+
+## 3.6.11
+### Changed
+ - Export the "moment" object in FormioUtils so that it can be accessed from outside libraries.
+
+## 3.6.10
+### Fixed
+ - FOR-1491: Fix bug with Day when form rendered as HTML
+ - FOR-1812: Fixed issues where timezones were not converting properly.
+
+## 3.6.9
+### Fixed
+ - FOR-1747: Fixed many issues related to contextual data getting swapped (row vs. data) for certain checks within the renderer.
+ - Issues where error messages for fields would get drowned out (color-wise) when errors are showing up per-field.
+
+## 3.6.8
+### Fixed
+ - FOR-1793: Fixed an issue where a "/" would be appended to the Day component value when "Hide Year" was checked.
+ - Fixed a small bug where components may disable when they are not supposed to be.
+ - Problems where the highlighted errors and custom errors would not persist when they are presented.
+ - FOR-1789: Fixed an error where day component would cause beta portal to show 'Cannot read property data of undefined' in data section.
+
+### Changed
+ - Upgrade gulp-sass@4.0.2, i18next@11.10.0, eslint@5.7.0, webpack@4.21.0
+
+## 3.6.7
+### Fixed
+ - Problems with the Select component not working with Refresh On property for some cases.
+
+## 3.6.6
+### Fixed
+ - FOR-1733: Fixed issue with preview destroy on change.
+ - FOR-1728: Problems with running the renderer within iOS applications.
+
+## 3.6.5
+### Fixed
+ - Broken build.
+
+## 3.6.4
+### Chanded
+ - FOR-1591: API key regex.
+
+### Fixed
+ - FOR-1756: Number component missing delimiters when rendered in Edit Grid
+ - Allow webcam to upload at a higher resolution.
+
+### Added
+ - FOR-1762: 'wizardNavigationClicked' event for case of Wizard's top navigation click
+
 ## 3.6.3
 ### Fixed
  - FOR-1614: Configure the textfield calendar widget to store date as text without timezone conversion.
@@ -14,14 +197,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  - FOR-1587: Issues where the remove select item button is visible when component is disabled.
  - FOR-1733: Problems where the calendar would not properly destroy.
  - FOR-1733: Issues where the component preview would not properly destroy.
- 
+
 ### Added
  - FOR-1637: Ability to manually override calculated values.
  - FOR-1558: Tests to ensure there is not an issue with setting submissions with containers.
- 
+
 ### Changed
  - Upgrade @babel/cli@7.1.2, @babel/core@7.1.2, eslint@5.6.1, sinon@6.3.5
  - Moving the Form utilities to their own separate files.
+
+### Fixed
+ - Custom validation of components inside EditGrid.
 
 ## 3.6.2
 ### Fixed

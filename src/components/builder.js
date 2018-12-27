@@ -35,7 +35,9 @@ import TagsForm from './tags/Tags.form';
 import TextAreaForm from './textarea/TextArea.form';
 import TextFieldForm from './textfield/TextField.form';
 import TimeForm from './time/Time.form';
+import TreeForm from './tree/Tree.form';
 import WellForm from './well/Well.form';
+import UnknownForm from './unknown/Unknown.form';
 
 Components.address.editForm = AddressForm;
 Components.button.editForm = ButtonForm;
@@ -72,6 +74,8 @@ Components.tags.editForm = TagsForm;
 Components.textarea.editForm = TextAreaForm;
 Components.textfield.editForm = TextFieldForm;
 Components.time.editForm = TimeForm;
+Components.tree.editForm = TreeForm;
 Components.well.editForm = WellForm;
+Components.unknown.editForm = UnknownForm;
 
 export default Components;

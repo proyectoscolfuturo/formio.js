@@ -30,6 +30,7 @@ export default class FileComponent extends BaseComponent {
       label: 'Upload',
       key: 'file',
       image: false,
+      privateDownload: false,
       imageSize: '200',
       filePattern: '*',
       fileMinSize: '0KB',
@@ -79,6 +80,13 @@ export default class FileComponent extends BaseComponent {
   get defaultValue() {
     const value = super.defaultValue;
     return Array.isArray(value) ? value : [];
+  }
+
+  get hasTypes() {
+    return this.component.fileTypes &&
+      Array.isArray(this.component.fileTypes) &&
+      this.component.fileTypes.length !== 0 &&
+      (this.component.fileTypes[0].label !== '' || this.component.fileTypes[0].value !== '');
   }
 
   // File is always an array.
@@ -153,12 +161,14 @@ export default class FileComponent extends BaseComponent {
         this.ce('div', { class: 'row' },
           [
             this.ce('div', { class: 'col-md-1' }),
-            this.ce('div', { class: 'col-md-9' },
+            this.ce('div', { class: `col-md-${this.hasTypes ? '7' : '9'}` },
               this.ce('strong', {}, this.text('File Name'))
             ),
             this.ce('div', { class: 'col-md-2' },
               this.ce('strong', {}, this.text('Size'))
-            )
+            ),
+            this.hasTypes ?
+              this.ce('div', { class: 'col-md-2' }, this.ce('strong', {}, this.text('Type'))): null,
           ]
         )
       ),
@@ -201,8 +211,10 @@ export default class FileComponent extends BaseComponent {
                 null
             )
           ),
-          this.ce('div', { class: 'col-md-9' }, this.createFileLink(fileInfo)),
-          this.ce('div', { class: 'col-md-2' }, this.fileSize(fileInfo.size))
+          this.ce('div', { class: `col-md-${this.hasTypes ? '7' : '9'}` }, this.createFileLink(fileInfo)),
+          this.ce('div', { class: 'col-md-2' }, this.fileSize(fileInfo.size)),
+          this.hasTypes ?
+            this.ce('div', { class: 'col-md-2' }, this.createTypeSelect(fileInfo)): null,
         ]
       )
     );
@@ -216,6 +228,22 @@ export default class FileComponent extends BaseComponent {
       href: file.url, target: '_blank',
       onClick: this.getFile.bind(this, file)
     }, file.originalName || file.name);
+  }
+
+  createTypeSelect(file) {
+    return this.ce('select', {
+      class: 'file-type',
+      onChange: (event) => {
+        file.fileType = event.target.value;
+        this.triggerChange();
+      }
+    }, this.component.fileTypes.map(type => this.ce('option', {
+          value: type.value,
+          class: 'test',
+          selected: type.value === file.fileType ? 'selected' : undefined,
+        }, type.label)
+      )
+    );
   }
 
   buildImageList() {
@@ -276,8 +304,6 @@ export default class FileComponent extends BaseComponent {
   }
 
   startVideo() {
-    const width = parseInt(this.component.webcamSize) || 320;
-    const height = width * 3 / 4;
     navigator.getMedia = (navigator.getUserMedia ||
       navigator.webkitGetUserMedia ||
       navigator.mozGetUserMedia ||
@@ -285,7 +311,11 @@ export default class FileComponent extends BaseComponent {
 
     navigator.getMedia(
       {
-        video: true,
+        video: {
+          width: { min: 640, ideal: 1920 },
+          height: { min: 400, ideal: 1080 },
+          aspectRatio: { ideal: 1.7777777778 }
+        },
         audio: false
       },
       (stream) => {
@@ -294,13 +324,10 @@ export default class FileComponent extends BaseComponent {
         }
         else {
           this.video.srcObject = stream;
-          this.video.play();
         }
-        // height = this.video.videoHeight / (this.video.videoWidth / width);
+        const width = parseInt(this.component.webcamSize) || 320;
         this.video.setAttribute('width', width);
-        this.video.setAttribute('height', height);
-        this.canvas.setAttribute('width', width);
-        this.canvas.setAttribute('height', height);
+        this.video.play();
       },
       (err) => {
         console.log(err);
@@ -309,9 +336,9 @@ export default class FileComponent extends BaseComponent {
   }
 
   takePicture() {
-    const width = parseInt(this.component.webcamSize) || 320;
-    const height = this.video.videoHeight / (this.video.videoWidth / width);
-    this.canvas.getContext('2d').drawImage(this.video, 0, 0, width, height);
+    this.canvas.setAttribute('width', this.video.videoWidth);
+    this.canvas.setAttribute('height', this.video.videoHeight);
+    this.canvas.getContext('2d').drawImage(this.video, 0, 0);
     this.canvas.toBlob(blob => {
       blob.name = `photo-${Date.now()}.png`;
       this.upload([blob]);
@@ -408,11 +435,14 @@ export default class FileComponent extends BaseComponent {
                 },
                 [
                   this.ce('i', { class: this.iconClass('cloud-upload') }),
-                  this.text(' Drop files to attach, or '),
+                  this.text(' '),
+                  this.text('Drop files to attach, or'),
+                  this.text(' '),
                   this.buildBrowseLink(),
                   this.component.webcam ?
                     [
-                      this.text(', or '),
+                      this.text(', or'),
+                      this.text(' '),
                       this.ce('a',
                         {
                           href: '#',
@@ -711,6 +741,9 @@ export default class FileComponent extends BaseComponent {
         this.uploadStatusList.appendChild(uploadStatus);
 
         if (fileUpload.status !== 'error') {
+          if (this.component.privateDownload) {
+            file.private = true;
+          }
           fileService.uploadFile(this.component.storage, file, fileName, dir, evt => {
             fileUpload.status = 'progress';
             fileUpload.progress = parseInt(100.0 * evt.loaded / evt.total);
@@ -721,6 +754,10 @@ export default class FileComponent extends BaseComponent {
           }, this.component.url)
             .then(fileInfo => {
               this.removeChildFrom(uploadStatus, this.uploadStatusList);
+              // Default to first type.
+              if (this.hasTypes) {
+                fileInfo.fileType = this.component.fileTypes[0].value;
+              }
               fileInfo.originalName = file.name;
               this.dataValue.push(fileInfo);
               this.refreshDOM();
@@ -743,6 +780,9 @@ export default class FileComponent extends BaseComponent {
     const fileService = this.fileService;
     if (!fileService) {
       return alert('File Service not provided');
+    }
+    if (this.component.privateDownload) {
+      fileInfo.private = true;
     }
     fileService.downloadFile(fileInfo).then((file) => {
       if (file) {

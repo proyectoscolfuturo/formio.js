@@ -1,6 +1,5 @@
 import _ from 'lodash';
 import Promise from 'native-promise-only';
-import { checkCondition } from '../../utils/utils';
 import BaseComponent from '../base/Base';
 import Components from '../Components';
 
@@ -36,6 +35,28 @@ export default class NestedComponent extends BaseComponent {
     schema.components = [];
     this.eachComponent((component) => schema.components.push(component.schema));
     return schema;
+  }
+
+  set visible(value) {
+    super.visible = value;
+    this.components.forEach(component => {
+      component.parentVisible = this.visible;
+    });
+  }
+
+  get visible() {
+    return super.visible;
+  }
+
+  set parentVisible(value) {
+    super.parentVisible = value;
+    this.components.forEach(component => {
+      component.parentVisible = this.visible;
+    });
+  }
+
+  get parentVisible() {
+    return super.parentVisible;
   }
 
   getComponents() {
@@ -96,17 +117,28 @@ export default class NestedComponent extends BaseComponent {
    * @param {function} fn - Called with the component once found.
    * @return {Object} - The component that is located.
    */
-  getComponent(key, fn) {
+  getComponent(path, fn) {
+    path = Array.isArray(path) ? path : [path];
+    const [key, ...remainingPath] = path;
     let comp = null;
+
+    if (!_.isString(key)) {
+      return comp;
+    }
+
     this.everyComponent((component, components) => {
       if (component.component.key === key) {
         comp = component;
-        if (fn) {
+        if (remainingPath.length > 0 && 'getComponent' in component) {
+          comp = component.getComponent(remainingPath, fn);
+        }
+        else if (fn) {
           fn(component, components);
         }
         return false;
       }
     });
+
     return comp;
   }
 
@@ -140,6 +172,7 @@ export default class NestedComponent extends BaseComponent {
   createComponent(component, options, data, before, state) {
     options = options || this.options;
     data = data || this.data;
+
     const comp = Components.create(component, options, data, true);
     comp.parent = this;
     comp.root = this.root || this;
@@ -283,14 +316,27 @@ export default class NestedComponent extends BaseComponent {
     }
     else {
       const components = this.hook('addComponents', this.componentComponents, this) || [];
-      components.forEach((component) => {
-        let compState = {};
-        if (state && state.components && state.components[component.key]) {
-          compState = state.components[component.key];
-        }
-        this.addComponent(component, element, data, null, null, compState);
-      });
+      components.forEach((component) => this.addComponent(
+        component,
+        element,
+        data,
+        null,
+        null,
+        this.getComponentState(component, state)
+      ));
     }
+  }
+
+  getComponentState(component = {}, state = {}) {
+    const { key } = component;
+    const { components } = state;
+    const substate = {};
+
+    if (components) {
+      Object.assign(substate, components[key]);
+    }
+
+    return substate;
   }
 
   updateValue(flags) {
@@ -347,7 +393,14 @@ export default class NestedComponent extends BaseComponent {
 
   clearOnHide(show) {
     super.clearOnHide(show);
+    if (this.component.clearOnHide && this.hasValue()) {
+      this.restoreComponentsContext();
+    }
     this.getComponents().forEach((component) => component.clearOnHide(show));
+  }
+
+  restoreComponentsContext() {
+    this.getComponents().forEach((component) => component.data = this.dataValue);
   }
 
   show(show) {
@@ -411,7 +464,7 @@ export default class NestedComponent extends BaseComponent {
   }
 
   checkValidity(data, dirty) {
-    if (!checkCondition(this.component, data, this.data, this.root ? this.root._form : {}, this)) {
+    if (!this.checkCondition(null, data)) {
       this.setCustomValidity('');
       return true;
     }

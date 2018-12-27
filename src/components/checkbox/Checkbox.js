@@ -34,6 +34,10 @@ export default class CheckBoxComponent extends BaseComponent {
     return this.component.name ? '' : (this.component.defaultValue || false).toString() === 'true';
   }
 
+  get hasSetValue() {
+    return this.hasValue();
+  }
+
   elementInfo() {
     const info = super.elementInfo();
     info.type = 'input';
@@ -72,6 +76,10 @@ export default class CheckBoxComponent extends BaseComponent {
 
   get emptyValue() {
     return false;
+  }
+
+  isEmpty(value) {
+    return super.isEmpty(value) || value === false;
   }
 
   createElement() {
@@ -129,10 +137,6 @@ export default class CheckBoxComponent extends BaseComponent {
         marginLeft: 0
       });
     }
-  }
-
-  isEmpty(value) {
-    return super.isEmpty(value) || value === false;
   }
 
   createLabel(container, input) {
