@@ -395,23 +395,21 @@ export default class DayComponent extends BaseComponent {
       return null;
     }
     const parts = value.split('/');
-    let day, month, year;
-    if (this.component.dayFirst && this.showDay) {
+    let day;
+    // start colfuturo changes
+    if (this.component.dayFirst) {
       day = parts.shift();
       this.dayInput.value = day === '00' ? undefined : parseInt(day, 10);
     }
-    if (this.showMonth) {
-      month = parts.shift();
-      this.monthInput.value = month === '00' ? undefined : parseInt(month, 10);
-    }
-    if (!this.component.dayFirst && this.showDay) {
+    const month = parts.shift();
+    this.monthInput.value = month === '00' ? undefined : parseInt(month, 10);
+    if (!this.component.dayFirst) {
       day = parts.shift();
       this.dayInput.value = day === '00' ? undefined : parseInt(day, 10);
     }
-    if (this.showYear) {
-      year = parts.shift();
-      this.yearInput.value = year === '0000' ? undefined : parseInt(year, 10);
-    }
+    const year = parts.shift();
+    this.yearInput.value = year === '0000' ? undefined : parseInt(year, 10);
+    // end colfuturo changes
   }
 
   /**
@@ -446,35 +444,13 @@ export default class DayComponent extends BaseComponent {
    * @return {*}
    */
   getDate(value) {
-    // <<<<<<< HEAD
-    //     if (!this.dayInput && !this.monthInput && !this.yearInput) {
-    //       if (typeof (this.data) === 'string' && this.data.length > 0) {
-    //         return moment(this.data, this.format);
-    //       }
-    //     }
-    //     var day = !this.dayInput || _.isNaN(this.dayInput.value) ? 0 : parseInt(this.dayInput.value, 10);
-    //     var month = !this.monthInput || _.isNaN(this.monthInput.value) ? -1 : (parseInt(this.monthInput.value, 10) - 1);
-    //     var year = !this.yearInput || _.isNaN(this.yearInput.value) ? 0 : parseInt(this.yearInput.value, 10);
-    //     if (this.showDay && !day) {
-    //       return null;
-    //     }
-    //     else if (!this.showDay) {
-    //       day = 1;
-    //     }
-    //     if (this.showMonth && (month < 0)) {
-    //       return null;
-    //     }
-    //     else if (!this.showMonth) {
-    //       month = 0;
-    //     }
-    //     if (this.showYear && !year) {
-    //       return null;
-    //     }
-    //     else if (!this.showYear) {
-    //       year = 1900;
-    //     }
-    //     return moment([year, month, day]);
-    // =======
+    // start colfuturo changes
+    if (!this.dayInput && !this.monthInput && !this.yearInput) {
+      if (typeof (this.data) === 'string' && this.data.length > 0) {
+        return this.data.replace('/0000','').replace('00/','');
+      }
+    }
+    // end colfuturo changes
     let defaults = [], day, month, year;
     // Map positions to identifiers to get default values for each part of day
     const [DAY, MONTH, YEAR] = this.component.dayFirst ? [0, 1, 2] : [1, 0, 2];
