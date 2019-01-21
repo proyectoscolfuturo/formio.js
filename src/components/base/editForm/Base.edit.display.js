@@ -121,7 +121,7 @@ export default [
     label: 'Error Label',
     placeholder: 'Error Label',
     tooltip: 'The label for this field when an error occurs.'
-  },{
+  }, {
     weight: 401,
     type: 'checkbox',
     input: true,
@@ -241,6 +241,13 @@ export default [
     key: 'frontOffice',
     input: true,
     defaultValue: true,
+  }, {
+    weight: 1600,
+    type: 'checkbox',
+    label: 'Unique',
+    tooltip: 'This check validates if the field value does not repeat ',
+    key: 'unique',
+    input: true
   },
   {
     weight: 1550,
