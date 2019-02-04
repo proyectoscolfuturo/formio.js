@@ -241,13 +241,6 @@ export default [
     key: 'frontOffice',
     input: true,
     defaultValue: true,
-  }, {
-    weight: 1600,
-    type: 'checkbox',
-    label: 'Unique',
-    tooltip: 'This check validates if the field value does not repeat ',
-    key: 'unique',
-    input: true
   },
   {
     weight: 1550,
