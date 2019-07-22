@@ -10,7 +10,7 @@ export default [
         input: true,
         label: 'Region Bias',
         key: 'region',
-        tooltip: "The region bias to use for this search. See <a href='https://developers.google.com/maps/documentation/geocoding/intro#RegionCodes' target='_blank'>Region Biasing</a> for more information.",
+        tooltip: "La región a usar para esta búsqueda. Ver <a href='https://developers.google.com/maps/documentation/geocoding/intro#RegionCodes' target='_blank'>Region Biasing</a> para más información.",
         placeholder: 'Dallas'
       },
       {
@@ -18,7 +18,7 @@ export default [
         input: true,
         label: 'Google Maps API Key',
         key: 'key',
-        tooltip: "The API key for Google Maps. See <a href='https://developers.google.com/maps/documentation/geocoding/get-api-key' target='_blank'>Get an API Key</a> for more information.",
+        tooltip: "Llave de API para Google Maps. Ver <a href='https://developers.google.com/maps/documentation/geocoding/get-api-key' target='_blank'>Get an API Key</a> para más información.",
         placeholder: 'xxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxx'
       },
      /*  {

@@ -5,10 +5,10 @@ export default [
     input: true,
     key: 'key',
     label: 'Property Name',
-    tooltip: 'The name of this field in the API endpoint.',
+    tooltip: 'Nombre de este campo en el endpoint de la API.',
     validate: {
       pattern: '(\\w|\\w[\\w-.]*\\w)',
-      patternMessage: 'The property name must only contain alphanumeric characters, underscores, dots and dashes and should not be ended by dash or dot.'
+      patternMessage: 'El nombre de la propiedad debe contener solamente caracteres alfanuméricos, guiones bajos, medios, puntos y no debe terminar con guion medio o punto.'
     }
   },
   {
@@ -17,14 +17,14 @@ export default [
     input: true,
     label: 'Field Tags',
     storeas: 'array',
-    tooltip: 'Tag the field for use in custom logic.',
+    tooltip: 'Etiqueta el campo para su uso en lógica personalizada.',
     key: 'tags'
   },
   {
     weight: 200,
     type: 'datamap',
     label: 'Custom Properties',
-    tooltip: 'This allows you to configure any custom properties for this component.',
+    tooltip: 'Esto te permite configurar cualquier propiedad personalizada para este componente.',
     key: 'properties',
     valueComponent: {
       type: 'textfield',

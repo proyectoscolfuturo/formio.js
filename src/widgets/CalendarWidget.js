@@ -1,4 +1,6 @@
 import Flatpickr from 'flatpickr';
+import { Spanish } from 'flatpickr/dist/l10n/es';
+// or import { Russian } from "flatpickr/dist/l10n/ru.js"
 import InputWidget from './InputWidget';
 import {
   convertFormatToFlatpickr,
@@ -34,7 +36,8 @@ export default class CalendarWidget extends InputWidget {
       format: DEFAULT_FORMAT,
       dateFormat: ISO_8601_FORMAT,
       useLocaleSettings: false,
-      language: 'us-en',
+      language: 'en_us',
+      locale: 'ru',
       defaultDate: null,
       hourIncrement: 1,
       minuteIncrement: 5,
@@ -102,6 +105,7 @@ export default class CalendarWidget extends InputWidget {
     this.settings.altFormat = convertFormatToFlatpickr(this.settings.format);
     this.settings.dateFormat = convertFormatToFlatpickr(this.settings.dateFormat);
     this.settings.onChange = () => this.emit('update');
+    this.settings.locale = Spanish;
     this.settings.onClose = () => (this.closedOn = Date.now());
     this.settings.formatDate = (date, format) => {
       // Only format this if this is the altFormat and the form is readOnly.

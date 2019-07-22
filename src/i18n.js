@@ -3,42 +3,42 @@ export default {
   resources: {
     en: {
       translation: {
-        complete: 'Submission Complete',
-        error: 'Please fix the following errors before submitting.',
-        required: '{{field}} is required',
-        pattern: '{{field}} does not match the pattern {{pattern}}',
-        minLength: '{{field}} must be longer than {{length}} characters.',
-        maxLength: '{{field}} must be shorter than {{length}} characters.',
-        min: '{{field}} cannot be less than {{min}}.',
-        max: '{{field}} cannot be greater than {{max}}.',
-        maxDate: '{{field}} should not contain date after {{- maxDate}}',
-        minDate: '{{field}} should not contain date before {{- minDate}}',
-        invalid_email: '{{field}} must be a valid email.', // eslint-disable-line camelcase
-        invalid_url: '{{field}} must be a valid url.', // eslint-disable-line camelcase
-        invalid_regex: '{{field}} does not match the pattern {{regex}}.', // eslint-disable-line camelcase
-        invalid_date: '{{field}} is not a valid date.', // eslint-disable-line camelcase
-        invalid_day: '{{field}} is not a valid day.', // eslint-disable-line camelcase
-        mask: '{{field}} does not match the mask.',
+        complete: 'Envío de formulario exitoso',
+        error: 'Por favor solucionar los siguientes errores antes del envío del formulario.',
+        required: '{{field}} campo requerido',
+        pattern: '{{field}} no es igual al patrón {{pattern}}',
+        minLength: '{{field}} debe ser mayor a {{length}} characters.',
+        maxLength: '{{field}} debe ser menor a {{length}} characters.',
+        min: '{{field}} El tamaño no puede ser menor a {{min}}.',
+        max: '{{field}} El tamaño no puede ser mayor a {{max}}.',
+        maxDate: '{{field}} no puede contener una fecha despues de {{- maxDate}}',
+        minDate: '{{field}} no puede contener una fecha antes de {{- minDate}}',
+        invalid_email: '{{field}} debe ser un correo válida.', // eslint-disable-line camelcase
+        invalid_url: '{{field}} debe ser una url válida.', // eslint-disable-line camelcase
+        invalid_regex: '{{field}} no es igual al patrón {{regex}}.', // eslint-disable-line camelcase
+        invalid_date: '{{field}} no es una fecha válida.', // eslint-disable-line camelcase
+        invalid_day: '{{field}} no es un día válido.', // eslint-disable-line camelcase
+        mask: '{{field}} no iguala la máscara.',
         stripe: '{{stripe}}',
-        month: 'Month',
-        day: 'Day',
-        year: 'Year',
-        january: 'January',
-        february: 'February',
-        march: 'March',
-        april: 'April',
-        may: 'May',
-        june: 'June',
-        july: 'July',
-        august: 'August',
-        september: 'September',
-        october: 'October',
-        november: 'November',
-        december: 'December',
-        next: 'Next',
-        previous: 'Previous',
-        cancel: 'Cancel',
-        submit: 'Submit Form'
+        month: 'Mes',
+        day: 'Día',
+        year: 'Año',
+        january: 'Enero',
+        february: 'Febrero',
+        march: 'Marzo',
+        april: 'Abril',
+        may: 'Mayo',
+        june: 'Junio',
+        july: 'Julio',
+        august: 'Agosto',
+        september: 'Septiembre',
+        october: 'Octubre',
+        november: 'Noviembre',
+        december: 'Diciembre',
+        next: 'Siguiente',
+        previous: 'Anterior',
+        cancel: 'Cancelar',
+        submit: 'Enviar Formulario'
       }
     }
   }

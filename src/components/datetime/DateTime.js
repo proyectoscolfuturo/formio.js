@@ -86,7 +86,8 @@ export default class DateTimeComponent extends BaseComponent {
       time_24hr: time24hr,
       readOnly: this.options.readOnly,
       minDate: _.get(this.component, 'datePicker.minDate'),
-      maxDate: _.get(this.component, 'datePicker.maxDate')
+      maxDate: _.get(this.component, 'datePicker.maxDate'),
+      locale:  _.get(this.copmponent, 'datePicker.locale')
     };
     /* eslint-enable camelcase */
 

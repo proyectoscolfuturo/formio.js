@@ -7,7 +7,7 @@ export default [
     key: 'defaultValue',
     weight: 100,
     placeholder: 'Default Value',
-    tooltip: 'The will be the value for this field, before user interaction. Having a default value will override the placeholder text.',
+    tooltip: 'Será el valor del campo, antes de la interacción del usuario. Tener un valor por defecto sobreescribirá el placeholder.',
     input: true
   },
   {
@@ -16,7 +16,7 @@ export default [
     key: 'refreshOn',
     label: 'Refresh On',
     weight: 110,
-    tooltip: 'Refresh data when another field changes.',
+    tooltip: 'Refresca los datos cuando otro campo cambia.',
     dataSrc: 'custom',
     valueProperty: 'value',
     data: {
@@ -39,7 +39,7 @@ export default [
     weight: 111,
     key: 'clearOnRefresh',
     label: 'Clear Value On Refresh',
-    tooltip: 'When the Refresh On field is changed, clear this components value.'
+    tooltip: 'Cuando el campo Refresh On cambia, se cambia el valor de este componente.'
   },
   EditFormUtils.javaScriptValue('Custom Default Value', 'customDefaultValue', 'customDefaultValue', 120,
     '<p><h4>Example:</h4><pre>value = data.firstName + " " + data.lastName;</pre></p>',
@@ -55,13 +55,13 @@ export default [
     weight: 131,
     key: 'allowCalculateOverride',
     label: 'Allow Manual Override of Calculated Value',
-    tooltip: 'When checked, this will allow the user to manually override the calculated value.'
+    tooltip: 'Cuándo sea seleccionado, ésto permitirá sobreescribir el valor calculado.'
   },
   {
     weight: 400,
     type: 'checkbox',
     label: 'Encrypt',
-    tooltip: 'Encrypt this field on the server. This is two way encryption which is not be suitable for passwords.',
+    tooltip: 'Encripta este campo en el servidor, ésta es una encriptación bidireccional, la cual no es adecuada para contraseñas. ',
     key: 'encrypted',
     input: true
   },
@@ -71,7 +71,7 @@ export default [
     weight: 500,
     key: 'dbIndex',
     label: 'Database Index',
-    tooltip: 'Set this field as an index within the database. Increases performance for submission queries.'
+    tooltip: 'Establece este campo como un index en la base de datos. Aumenta el rendimiento para consultas de presentación.'
   }
 ];
 /* eslint-enable max-len */

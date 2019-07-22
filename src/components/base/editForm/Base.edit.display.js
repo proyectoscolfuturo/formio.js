@@ -7,7 +7,7 @@ export default [
     key: 'label',
     label: 'Label',
     placeholder: 'Field Label',
-    tooltip: 'The label for this field that will appear next to it.',
+    tooltip: 'El título de este campo que aparecerá junto a éste.',
     validate: {
       required: true
     }
@@ -16,7 +16,7 @@ export default [
     weight: 10,
     type: 'checkbox',
     label: 'Hide Label',
-    tooltip: 'Hide the label of this component. This allows you to show the label in the form builder, but not when it is rendered.',
+    tooltip: 'Oculta el título de este componente. Esto te permite mostrar el título en el constructor del formulario, pero no se muestra cuando éste es renderizado.',
     key: 'hideLabel',
     input: true
   },
@@ -25,7 +25,7 @@ export default [
     input: true,
     key: 'labelPosition',
     label: 'Label Position',
-    tooltip: 'Position for the label for this field.',
+    tooltip: 'Posición para el título de este campo.',
     weight: 20,
     defaultValue: 'top',
     dataSrc: 'values',
@@ -45,7 +45,7 @@ export default [
     input: true,
     key: 'labelWidth',
     label: 'Label Width',
-    tooltip: 'The width of label on line in percentages.',
+    tooltip: 'El ancho del título en línea en porcentaje.',
     clearOnHide: false,
     weight: 30,
     placeholder: '30',
@@ -68,7 +68,7 @@ export default [
     input: true,
     key: 'labelMargin',
     label: 'Label Margin',
-    tooltip: 'The width of label margin on line in percentages.',
+    tooltip: 'El ancho del margen del título en línea en porcentaje.',
     clearOnHide: false,
     weight: 30,
     placeholder: '3',
@@ -102,7 +102,7 @@ export default [
     key: 'description',
     label: 'Description',
     placeholder: 'Description for this field.',
-    tooltip: 'The description is text that will appear below the input field.'
+    tooltip: 'La descripción es texto que aparece debajo del campo.'
   },
   {
     weight: 300,
@@ -110,8 +110,8 @@ export default [
     input: true,
     key: 'tooltip',
     label: 'Tooltip',
-    placeholder: 'To add a tooltip to this field, enter text here.',
-    tooltip: 'Adds a tooltip to the side of this field.'
+    placeholder: 'Para incluirle un tooltip a este campo, ingresa el texto aquí.',
+    tooltip: 'Incluye un tooltip al lado de este campo.'
   },
   {
     weight: 400,
@@ -120,14 +120,14 @@ export default [
     key: 'errorLabel',
     label: 'Error Label',
     placeholder: 'Error Label',
-    tooltip: 'The label for this field when an error occurs.'
+    tooltip: 'El título de este campo cuando ocurre un error.'
   }, {
     weight: 401,
     type: 'checkbox',
     input: true,
     defaultValue: true,
     key: 'showDataGrid',
-    label: 'Show in Grid columns'
+    label: 'Mostrar en columnas de una cuadrícula.'
   },
   {
     weight: 500,
@@ -136,7 +136,7 @@ export default [
     key: 'customClass',
     label: 'Custom CSS Class',
     placeholder: 'Custom CSS Class',
-    tooltip: 'Custom CSS class to add to this component.'
+    tooltip: 'Clase CSS personalizada para este componente.'
   },
   {
     weight: 600,
@@ -145,13 +145,13 @@ export default [
     key: 'tabindex',
     label: 'Tab Index',
     placeholder: 'Tab Index',
-    tooltip: 'Sets the tabindex attribute of this component to override the tab order of the form. See the <a href=\\\'https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/tabindex\\\'>MDN documentation</a> on tabindex for more information.'
+    tooltip: 'Establece el atributo tabindex de este componente para sobreescribir el orden de las pestañas del formulario. Ver <a href=\\\'https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/tabindex\\\'>MDN documentation</a> en tabindex para más información.'
   },
   {
     weight: 700,
     type: 'radio',
     label: 'Persistent',
-    tooltip: 'A persistent field will be stored in database when the form is submitted.',
+    tooltip: 'Un campo persistente sera almacenado en base de datos cuando el formulario sea enviado.',
     key: 'persistent',
     input: true,
     inline: true,
@@ -165,7 +165,7 @@ export default [
     weight: 800,
     type: 'checkbox',
     label: 'Multiple Values',
-    tooltip: 'Allows multiple values to be entered for this field.',
+    tooltip: 'Permite ingresar múltiples valores para este campo.',
     key: 'multiple',
     input: true
   },
@@ -174,14 +174,14 @@ export default [
     type: 'checkbox',
     label: 'Clear Value When Hidden',
     key: 'clearOnHide',
-    tooltip: 'When a field is hidden, clear the value.',
+    tooltip: 'Borra el valor del campo cuando éste se esconde.',
     input: true
   },
   {
     weight: 1000,
     type: 'checkbox',
     label: 'Protected',
-    tooltip: 'A protected field will not be returned when queried via API.',
+    tooltip: 'Un campo protegido no será retornado cuando se consulte vía API.',
     key: 'protected',
     input: true
   },
@@ -189,7 +189,7 @@ export default [
     weight: 1100,
     type: 'checkbox',
     label: 'Hidden',
-    tooltip: 'A hidden field is still a part of the form, but is hidden from view.',
+    tooltip: 'Un campo oculto que sigue siendo parte del formulario, pero está oculto de la vista.',
     key: 'hidden',
     input: true
   },
@@ -197,7 +197,7 @@ export default [
     weight: 1300,
     type: 'checkbox',
     label: 'Hide Input',
-    tooltip: 'Hide the input in the browser. This does not encrypt on the server. Do not use for passwords.',
+    tooltip: 'Oculta el input en el navegador. No se encripta en el servidor. No usarb para contraseñas.',
     key: 'mask',
     input: true
   },
@@ -205,7 +205,7 @@ export default [
     weight: 1310,
     type: 'checkbox',
     label: 'Show Label in DataGrid',
-    tooltip: 'Show the label when in a Datagrid.',
+    tooltip: 'Muestra el título en un DataGrid.',
     key: 'dataGridLabel',
     input: true,
     customConditional: 'show = instance.root.editComponent.inDataGrid'
@@ -214,7 +214,7 @@ export default [
     weight: 1400,
     type: 'checkbox',
     label: 'Disabled',
-    tooltip: 'Disable the form input.',
+    tooltip: 'Deshabilita el input.',
     key: 'disabled',
     input: true
   },
@@ -222,7 +222,7 @@ export default [
     weight: 1450,
     type: 'checkbox',
     label: 'Initial Focus',
-    tooltip: 'Make this field the initially focused element on this form.',
+    tooltip: 'Enfoca el campo al inicializar el formulario.',
     key: 'autofocus',
     input: true
   },
@@ -230,14 +230,14 @@ export default [
     weight: 1500,
     type: 'checkbox',
     label: 'Table View',
-    tooltip: 'Shows this value within the table view of the submissions.',
+    tooltip: 'Muestra este valor dentro de la vista de tabla de la presentación.',
     key: 'tableView',
     input: true
   }, {
     weight: 1600,
     type: 'checkbox',
     label: 'FrontOffice',
-    tooltip: 'Shows this value within the table view of the submissions.',
+    tooltip: 'Muestra este valor dentro de la vista de tabla de la presentación.',
     key: 'frontOffice',
     input: true,
     defaultValue: true,
@@ -246,7 +246,7 @@ export default [
     weight: 1550,
     type: 'checkbox',
     label: 'Always enabled',
-    tooltip: 'Make this field always enabled, even if the form is disabled',
+    tooltip: 'Hace que este campo esté siempre habilitado, incluso si el formulario esta deshabilitado',
     key: 'alwaysEnabled',
     input: true
   }

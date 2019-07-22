@@ -4,7 +4,7 @@ export default [
     input: true,
     key: 'enableTime',
     label: 'Enable Time Input',
-    tooltip: 'Enables time input for this field.',
+    tooltip: 'Habilita el ingreso de tipo hora en este campo.',
     weight: 0
   },
   {
@@ -12,7 +12,7 @@ export default [
     input: true,
     key: 'timePicker.hourStep',
     label: 'Hour Step Size',
-    tooltip: 'The number of hours to increment/decrement in the time picker.',
+    tooltip: 'El número de horas para incrementar/decrementar en el campo.',
     weight: 10
   },
   {
@@ -20,7 +20,7 @@ export default [
     input: true,
     key: 'timePicker.minuteStep',
     label: 'Minute Step Size',
-    tooltip: 'The number of minutes to increment/decrement in the time picker.',
+    tooltip: 'El número de minutos que se incrementan/decrementan en el campo.',
     weight: 20
   },
   {
@@ -28,7 +28,7 @@ export default [
     input: true,
     key: 'timePicker.showMeridian',
     label: '12 Hour Time (AM/PM)',
-    tooltip: 'Display time in 12 hour time with AM/PM.',
+    tooltip: 'Muestra el tiempo en un formato de 12 horas con AM/PM.',
     weight: 30
   }
 ];
