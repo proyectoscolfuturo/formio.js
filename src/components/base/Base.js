@@ -8,7 +8,9 @@ import Formio from '../../Formio';
 import Validator from '../Validator';
 import Widgets from '../../widgets';
 import Component from '../../Component';
-const CKEDITOR = 'https://cdn.staticaly.com/gh/formio/ckeditor5-build-classic/master/build/ckeditor.js';
+
+const CKEDITOR = 'https://cdn.staticaly.com/gh/formio/ckeditor5-build-classic/v12.0.0/build/ckeditor.js';
+//const CKEDITOR = 'https://cdn.staticaly.com/gh/formio/ckeditor5-build-classic/master/build/ckeditor.js';
 
 /**
  * This is the BaseComponent class which all elements within the FormioForm derive from.
