@@ -6,7 +6,7 @@ export default class DayComponent extends BaseComponent {
   static schema(...extend) {
     return BaseComponent.schema({
       type: 'day',
-      label: 'Day',
+      label: 'Día',
       key: 'day',
       fields: {
         day: {

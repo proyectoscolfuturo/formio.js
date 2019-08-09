@@ -34,6 +34,9 @@ export default class AddressComponent extends TextFieldComponent {
     if (component.map && component.map.key) {
       src += `&key=${component.map.key}`;
     }
+    if (component.map && component.map.language) {
+      src += `&language=${component.map.language}`;
+    }
     if (component.map && component.map.region) {
       src += `&region=${component.map.region}`;
     }

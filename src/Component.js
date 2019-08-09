@@ -15,7 +15,7 @@ export default class Component {
      * @type {{}}
      */
     this.options = _.assign({
-      language: 'en',
+      language: 'es',
       highlightErrors: true,
       row: '',
       namespace: 'formio'
