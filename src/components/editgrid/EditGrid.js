@@ -287,7 +287,7 @@ export default class EditGridComponent extends NestedComponent {
       [
         this.ce('span', { class: this.iconClass('plus'), 'aria-hidden': true }),
         ' ',
-        this.t(this.component.addAnother ? this.component.addAnother : 'Add Another', {})
+        this.t(this.component.addAnother ? this.component.addAnother : 'Agregar Otro', {})
       ])
     ));
   }

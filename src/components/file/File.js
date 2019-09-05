@@ -27,7 +27,7 @@ export default class FileComponent extends BaseComponent {
   static schema(...extend) {
     return BaseComponent.schema({
       type: 'file',
-      label: 'Upload',
+      label: 'Subir',
       key: 'file',
       image: false,
       privateDownload: false,
@@ -162,13 +162,13 @@ export default class FileComponent extends BaseComponent {
           [
             this.ce('div', { class: 'col-md-1' }),
             this.ce('div', { class: `col-md-${this.hasTypes ? '7' : '9'}` },
-              this.ce('strong', {}, this.text('File Name'))
+              this.ce('strong', {}, this.text('Nombre de archivo'))
             ),
             this.ce('div', { class: 'col-md-2' },
-              this.ce('strong', {}, this.text('Size'))
+              this.ce('strong', {}, this.text('Tamaño'))
             ),
             this.hasTypes ?
-              this.ce('div', { class: 'col-md-2' }, this.ce('strong', {}, this.text('Type'))): null,
+              this.ce('div', { class: 'col-md-2' }, this.ce('strong', {}, this.text('Tipo'))): null,
           ]
         )
       ),
@@ -436,17 +436,17 @@ export default class FileComponent extends BaseComponent {
                 [
                   this.ce('i', { class: this.iconClass('cloud-upload') }),
                   this.text(' '),
-                  this.text('Drop files to attach, or'),
+                  this.text('Arrastra un archivo para adjuntar, o'),
                   this.text(' '),
                   this.buildBrowseLink(),
                   this.component.webcam ?
                     [
-                      this.text(', or'),
+                      this.text(', o'),
                       this.text(' '),
                       this.ce('a',
                         {
                           href: '#',
-                          title: 'Use Web Camera',
+                          title: 'Usar Cámara Web',
                           onClick: (event) => {
                             event.preventDefault();
                             this.cameraMode = !this.cameraMode;
@@ -516,7 +516,7 @@ export default class FileComponent extends BaseComponent {
         }
       },
       class: 'browse'
-    }, this.text('browse'));
+    }, this.text('buscar en mi equipo'));
     this.addFocusBlurEvents(this.browseLink);
 
     return this.browseLink;
@@ -534,11 +534,11 @@ export default class FileComponent extends BaseComponent {
     if (!this.component.storage) {
       hasWarnings = true;
       warnings.appendChild(this.ce('p').appendChild(this.text(
-        'No storage has been set for this field. File uploads are disabled until storage is set up.')));
+        'Ningún tipo de almacenamiento ha sido configurado para este campo. Carga de archivos estará deshabilitada hasta que se configure un tipo de almacenamiento.')));
     }
     if (!this.support.dnd) {
       hasWarnings = true;
-      warnings.appendChild(this.ce('p').appendChild(this.text('File Drag/Drop is not supported for this browser.')));
+      warnings.appendChild(this.ce('p').appendChild(this.text('Este navegador no soporta Carga/Descarga de archivos.')));
     }
     if (!this.support.filereader) {
       hasWarnings = true;
@@ -708,7 +708,7 @@ export default class FileComponent extends BaseComponent {
           name: fileName,
           size: file.size,
           status: 'info',
-          message: 'Starting upload'
+          message: 'Empezando subida'
         };
 
         // Check file pattern

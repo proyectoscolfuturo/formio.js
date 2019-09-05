@@ -10,13 +10,13 @@ export default class DataMapComponent extends NestedComponent {
       key: 'dataMap',
       type: 'datamap',
       clearOnHide: true,
-      addAnother: 'Add Another',
+      addAnother: 'Agregar Otro',
       disableAddingRemovingRows: false,
       keyBeforeValue: true,
       valueComponent: {
         type: 'textfield',
         key: 'value',
-        label: 'Value',
+        label: 'Valor',
         defaultValue: 'Value',
         input: true
       },
@@ -152,9 +152,9 @@ export default class DataMapComponent extends NestedComponent {
     }
     const keyHeader = this.ce('th', {
       'class': 'col-2 col-sm-3'
-    }, this.text('Key'));
+    }, this.text('Llave'));
     this.createTooltip(keyHeader, {
-      tooltip: this.t('Enter the map "key" for this value.')
+      tooltip: this.t('Ingresa la "llave" para este valor.')
     });
     return this.ce('thead', null, this.ce('tr', {
         class: 'd-flex'

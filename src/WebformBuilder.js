@@ -902,7 +902,7 @@ export default class WebformBuilder extends Webform {
     if (!this.getComponents().length) {
       this.submitButton = this.addComponent({
         type: 'button',
-        label: 'Submit',
+        label: 'Guardar',
         key: 'submit',
         size: 'md',
         block: false,

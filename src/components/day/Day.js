@@ -92,18 +92,18 @@ export default class DayComponent extends BaseComponent {
     }
     this._months = [
       { value: undefined, label: _.get(this.component, 'fields.month.placeholder') || (this.hideInputLabels ? this.t('Month') : '') },
-      { value: 1, label: this.t('january') },
-      { value: 2, label: this.t('february') },
-      { value: 3, label: this.t('march') },
-      { value: 4, label: this.t('april') },
-      { value: 5, label: this.t('may') },
-      { value: 6, label: this.t('june') },
-      { value: 7, label: this.t('july') },
-      { value: 8, label: this.t('august') },
-      { value: 9, label: this.t('september') },
-      { value: 10, label: this.t('october') },
-      { value: 11, label: this.t('november') },
-      { value: 12, label: this.t('december') }
+      { value: 1, label: this.t('Enero') },
+      { value: 2, label: this.t('Febrero') },
+      { value: 3, label: this.t('Marzo') },
+      { value: 4, label: this.t('Abril') },
+      { value: 5, label: this.t('Mayo') },
+      { value: 6, label: this.t('junio') },
+      { value: 7, label: this.t('Julio') },
+      { value: 8, label: this.t('Agosto') },
+      { value: 9, label: this.t('Septiembre') },
+      { value: 10, label: this.t('Octubre') },
+      { value: 11, label: this.t('Noviembre') },
+      { value: 12, label: this.t('Diciembre') }
     ];
     return this._months;
   }
@@ -158,7 +158,7 @@ export default class DayComponent extends BaseComponent {
       : null;
 
     if (dayLabel) {
-      dayLabel.appendChild(this.text(this.t('day')));
+      dayLabel.appendChild(this.text(this.t('Día')));
       this.setSubinputLabelStyle(dayLabel);
     }
 
@@ -205,7 +205,7 @@ export default class DayComponent extends BaseComponent {
       : null;
 
     if (monthLabel) {
-      monthLabel.appendChild(this.text(this.t('month')));
+      monthLabel.appendChild(this.text(this.t('Mes')));
       this.setSubinputLabelStyle(monthLabel);
     }
 
@@ -259,7 +259,7 @@ export default class DayComponent extends BaseComponent {
       : null;
 
     if (yearLabel) {
-      yearLabel.appendChild(this.text(this.t('year')));
+      yearLabel.appendChild(this.text(this.t('Año')));
       this.setSubinputLabelStyle(yearLabel);
     }
 
