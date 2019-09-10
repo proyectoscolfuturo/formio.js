@@ -75,7 +75,7 @@ export default {
       key: 'validate.required',
       method: 'validateRequired',
       message(component) {
-        return component.t(component.errorMessage('required'), {
+        return component.t(component.errorMessage('Obligatorio'), {
           field: component.errorLabel,
           data: component.data
         });
@@ -124,7 +124,7 @@ export default {
     minLength: {
       key: 'validate.minLength',
       message(component, setting) {
-        return component.t(component.errorMessage('minLength'), {
+        return component.t(component.errorMessage('No ha alcanzado el mínimo de caracteres permitidos'), {
           field: component.errorLabel,
           length: (setting - 1),
           data: component.data
@@ -141,7 +141,7 @@ export default {
     maxLength: {
       key: 'validate.maxLength',
       message(component, setting) {
-        return component.t(component.errorMessage('maxLength'), {
+        return component.t(component.errorMessage('Sobrepasa el máximo de caracteres permitidos'), {
           field: component.errorLabel,
           length: (setting + 1),
           data: component.data

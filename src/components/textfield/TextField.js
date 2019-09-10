@@ -111,14 +111,18 @@ export default class TextFieldComponent extends BaseComponent {
 
   setCounter(type, element, count, max) {
     if (max) {
-      const remaining = max - count;
+      var remaining = max - count;
+      var txtRemaining = 'restantes';
       if (remaining > 0) {
         this.removeClass(element, 'text-danger');
+        txtRemaining = 'restantes';
       }
       else {
+        remaining = Math.abs(remaining);
+        txtRemaining = 'sobrantes';
         this.addClass(element, 'text-danger');
       }
-      element.innerHTML = this.t(`{{ remaining }} ${type} remaining.`, {
+      element.innerHTML = this.t(`{{ remaining }} ${type} ${txtRemaining}.`, {
         remaining: remaining
       });
     }
@@ -132,10 +136,21 @@ export default class TextFieldComponent extends BaseComponent {
   onChange(flags, fromRoot) {
     super.onChange(flags, fromRoot);
     if (this.wordCount) {
-      this.setCounter('words', this.wordCount, this.dataValue.trim().split(/\s+/).length, this.maxWordCount);
+      console.log('wordcount', this.wordCount);
+      if (this.wordCount === '1') {
+        this.setCounter('palabra', this.wordCount, this.dataValue.trim().split(/\s+/).length, this.maxWordCount);
+      }
+      else {
+        this.setCounter('palabras', this.wordCount, this.dataValue.trim().split(/\s+/).length, this.maxWordCount);
+      }
     }
     if (this.charCount) {
-      this.setCounter('characters', this.charCount, this.dataValue.length, this.maxCharCount);
+      if (this.charCount === 1) {
+        this.setCounter('carácter', this.charCount, this.dataValue.length, this.maxCharCount);
+      }
+      else {
+        this.setCounter('caracteres', this.charCount, this.dataValue.length, this.maxCharCount);
+      }
     }
   }
 
