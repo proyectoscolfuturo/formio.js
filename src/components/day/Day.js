@@ -97,7 +97,7 @@ export default class DayComponent extends BaseComponent {
       { value: 3, label: this.t('Marzo') },
       { value: 4, label: this.t('Abril') },
       { value: 5, label: this.t('Mayo') },
-      { value: 6, label: this.t('junio') },
+      { value: 6, label: this.t('Junio') },
       { value: 7, label: this.t('Julio') },
       { value: 8, label: this.t('Agosto') },
       { value: 9, label: this.t('Septiembre') },
