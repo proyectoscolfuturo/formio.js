@@ -122,7 +122,7 @@ export default class TextFieldComponent extends BaseComponent {
         txtRemaining = 'sobrantes';
         this.addClass(element, 'text-danger');
       }
-      element.innerHTML = this.t(`{{ remaining }} ${type} ${txtRemaining}.`, {
+      element.innerHTML = this.t(`{{ remaining }} ${type} ${txtRemaining}`, {
         remaining: remaining
       });
     }

@@ -9,6 +9,6 @@ bower_components
 
 npm-debug\.log
 
-dist/
+dist
 .ruby-version
 .ruby-gemset
