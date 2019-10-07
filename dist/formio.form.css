@@ -801,3 +801,9 @@ body.formio-dialog-open {
 .formio-component-dateTime .form-control[type="datetime-local"] ~ .input-group-addon {
   width: auto;
 }
+
+.hideSpinner input[type=number]::-webkit-inner-spin-button, 
+.hideSpinner input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}

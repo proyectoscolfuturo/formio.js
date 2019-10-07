@@ -3163,6 +3163,11 @@ body.formio-dialog-open {
   width: auto;
 }
 
+.hideSpinner input[type=number]::-webkit-inner-spin-button, 
+.hideSpinner input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
 .formbuilder {
   position: relative;
 }
@@ -3280,4 +3285,10 @@ body.formio-dialog-open {
 
 .panel-body .drag-and-drop-alert {
   margin-bottom: 0;
+}
+
+.hideSpinner input[type=number]::-webkit-inner-spin-button, 
+.hideSpinner input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
 }
