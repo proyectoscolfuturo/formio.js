@@ -1,6 +1,5 @@
 import Flatpickr from 'flatpickr';
 import { Spanish } from 'flatpickr/dist/l10n/es';
-// or import { Russian } from "flatpickr/dist/l10n/ru.js"
 import InputWidget from './InputWidget';
 import {
   convertFormatToFlatpickr,
@@ -36,8 +35,8 @@ export default class CalendarWidget extends InputWidget {
       format: DEFAULT_FORMAT,
       dateFormat: ISO_8601_FORMAT,
       useLocaleSettings: false,
-      language: 'en_us',
-      locale: 'ru',
+      language: 'es_ES',
+      locale: 'es',
       defaultDate: null,
       hourIncrement: 1,
       minuteIncrement: 5,
@@ -104,8 +103,12 @@ export default class CalendarWidget extends InputWidget {
     this.settings.defaultDate = getDateSetting(this.settings.defaultDate);
     this.settings.altFormat = convertFormatToFlatpickr(this.settings.format);
     this.settings.dateFormat = convertFormatToFlatpickr(this.settings.dateFormat);
-    this.settings.onChange = () => this.emit('update');
-    this.settings.locale = Spanish;
+    this.settings.onChange = () => {
+      this.emit('update');
+      this.calendar._input.value = this.fixMonthsNames(this.calendar._input.value);
+    };
+    //this.settings.locale = getDateSetting(this.settings.locale);
+    //this.settings.locale = Spanish;
     this.settings.onClose = () => (this.closedOn = Date.now());
     this.settings.formatDate = (date, format) => {
       // Only format this if this is the altFormat and the form is readOnly.
@@ -123,15 +126,31 @@ export default class CalendarWidget extends InputWidget {
     if (this._input) {
       // Create a new flatpickr.
       this.calendar = new Flatpickr(this._input, this.settings);
-
       // Enforce the input mask of the format.
       this.setInputMask(this.calendar._input, convertFormatToMask(this.settings.format));
-
       // Make sure we commit the value after a blur event occurs.
-      this.addEventListener(this.calendar._input, 'blur', () =>
-        this.calendar.setDate(this.calendar._input.value, true, this.settings.altFormat)
-      );
+      //this.addEventListener(this.calendar._input, 'change', () => {
+        //console.log('change');
+        //this.calendar.setDate(this.calendar._input.value, true, this.settings.altFormat);
+      //}
+      //);
     }
+  }
+
+  fixMonthsNames(value) {
+    if (value.includes('Dec')) {
+      value = value.replace('Dec','Dic');
+    }
+    if (value.includes('Jan')) {
+      value = value.replace('Jan','Ene');
+    }
+    if (value.includes('Aug')) {
+      value = value.replace('Aug','Ago');
+    }
+    if (value.includes('Apr')) {
+      value = value.replace('Apr','Abr');
+    }
+    return value;
   }
 
   get timezone() {
@@ -283,7 +302,6 @@ export default class CalendarWidget extends InputWidget {
     if (this.settings.saveAs === 'text') {
       return this.getDateValue(value, format);
     }
-
     return formatDate(value, format, this.timezone);
   }
 
