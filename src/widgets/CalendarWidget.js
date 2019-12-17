@@ -271,7 +271,6 @@ export default class CalendarWidget extends InputWidget {
     if (!(dates[0] instanceof Date)) {
       return 'Invalid Date';
     }
-
     return this.getDateValue(dates[0], this.valueFormat);
   }
 
@@ -290,6 +289,7 @@ export default class CalendarWidget extends InputWidget {
       }
       else {
         this.calendar.setDate(moment(value, this.valueMomentFormat).toDate(), false);
+        this.calendar._input.value = this.fixMonthsNames(this.calendar._input.value);
       }
     }
     else {
