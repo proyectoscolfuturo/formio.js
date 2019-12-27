@@ -384,10 +384,45 @@ export default class EditGridComponent extends NestedComponent {
     if (this.options.readOnly) {
       return;
     }
-    this.splice(rowIndex);
-    this.removeChildFrom(this.editRows[rowIndex].element, this.tableElement);
-    this.editRows.splice(rowIndex, 1);
-    this.updateGrid();
+    var node = document.createElement('DIV');
+    node.innerHTML = `
+    <div class="modal fade" id="confirmDialog" tabindex="-1" 
+      role="dialog" aria-labelledby="confirmDialogLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-body pt-5">
+            Se generará un nuevo presupuesto y perderás los cambios realizados.
+          </div>
+          <div class="modal-footer" style="border-top:0;justify-content: flex-start;">
+            <button type="button" id="confirm-cancel" class="btn btn-link"
+            style='font-weight:600;color:rgba(0, 0, 0, 0.87);'
+            >Cancelar</button>
+            <button type="button" id="confirm-accept" class="btn btn-link" 
+            style='font-weight:600;color:rgba(0, 0, 0, 0.87);'
+            >Aceptar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    `;
+    this.tableElement.appendChild(node);
+    var modalDialog = document.getElementById('confirmDialog');
+    modalDialog.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    modalDialog.style.display = 'block';
+    setTimeout(()=>{
+      modalDialog.style.opacity=1;
+    });
+    document.getElementById('confirm-cancel').onclick=()=>{
+      this.removeChildFrom(this.node, this.tableElement);
+      this.updateGrid();
+    };
+    document.getElementById('confirm-accept').onclick=()=>{
+      this.removeChildFrom(this.node, this.tableElement);
+      this.splice(rowIndex);
+      this.removeChildFrom(this.editRows[rowIndex].element, this.tableElement);
+      this.editRows.splice(rowIndex, 1);
+      this.updateGrid();
+    };
   }
 
   validateRow(rowIndex, dirty) {
