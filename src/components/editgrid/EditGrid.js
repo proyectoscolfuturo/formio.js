@@ -388,10 +388,10 @@ export default class EditGridComponent extends NestedComponent {
     node.innerHTML = `
     <div class="modal fade" id="confirmDialog" tabindex="-1" 
       role="dialog" aria-labelledby="confirmDialogLabel" aria-hidden="true">
-      <div class="modal-dialog" role="document">
+      <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
           <div class="modal-body pt-5">
-            Se generará un nuevo presupuesto y perderás los cambios realizados.
+          Esta acción eliminará la información de forma definitiva. ¿Deseas continuar?
           </div>
           <div class="modal-footer" style="border-top:0;justify-content: flex-start;">
             <button type="button" id="confirm-cancel" class="btn btn-link"
