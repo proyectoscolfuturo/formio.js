@@ -481,11 +481,11 @@ export default class EditGridComponent extends NestedComponent {
     });
 
     if (!rowsValid) {
-      this.setCustomValidity('Please correct rows before proceeding.', dirty);
+      this.setCustomValidity('', dirty);
       return false;
     }
     else if (!rowsClosed) {
-      this.setCustomValidity('Please save all rows before proceeding.', dirty);
+      this.setCustomValidity('', dirty);
       return false;
     }
 
