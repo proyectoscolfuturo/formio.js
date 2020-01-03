@@ -397,12 +397,12 @@ export default class EditGridComponent extends NestedComponent {
           Esta acción eliminará la información de forma definitiva. ¿Deseas continuar?
           </div>
           <div class="modal-footer" style="border-top:0;justify-content: flex-start;">
-            <button type="button" id="confirm-cancel" class="btn btn-link"
-            style='font-weight:600;color:rgba(0, 0, 0, 0.87);'
-            >Cancelar</button>
             <button type="button" id="confirm-accept" class="btn btn-link" 
             style='font-weight:600;color:rgba(0, 0, 0, 0.87);'
             >Aceptar</button>
+            <button type="button" id="confirm-cancel" class="btn btn-link"
+            style='font-weight:600;color:rgba(0, 0, 0, 0.87);'
+            >Cancelar</button>
           </div>
         </div>
       </div>
