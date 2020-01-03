@@ -390,7 +390,10 @@ export default class EditGridComponent extends NestedComponent {
       role="dialog" aria-labelledby="confirmDialogLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
-          <div class="modal-body pt-5">
+          <div class="modal-header pb-0 pt-4" style="border-bottom:0;">
+            <h5 style="font-size: 20px; color:black; font-weight:500;">Atención:</h5>
+          </div>
+          <div class="modal-body">
           Esta acción eliminará la información de forma definitiva. ¿Deseas continuar?
           </div>
           <div class="modal-footer" style="border-top:0;justify-content: flex-start;">
