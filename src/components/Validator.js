@@ -90,7 +90,7 @@ export default {
     min: {
       key: 'validate.min',
       message(component, setting) {
-        return component.t(component.errorMessage('min'), {
+        return component.t(component.errorMessage(`El valor mínimo es ${setting}`), {
           field: component.errorLabel,
           min: parseFloat(setting),
           data: component.data
@@ -107,7 +107,7 @@ export default {
     max: {
       key: 'validate.max',
       message(component, setting) {
-        return component.t(component.errorMessage('max'), {
+        return component.t(component.errorMessage('`El valor máximo es ${setting}`'), {
           field: component.errorLabel,
           max: parseFloat(setting),
           data: component.data
