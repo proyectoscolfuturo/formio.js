@@ -107,7 +107,7 @@ export default {
     max: {
       key: 'validate.max',
       message(component, setting) {
-        return component.t(component.errorMessage('`El valor máximo es ${setting}`'), {
+        return component.t(component.errorMessage(`El valor máximo es ${setting}`), {
           field: component.errorLabel,
           max: parseFloat(setting),
           data: component.data
