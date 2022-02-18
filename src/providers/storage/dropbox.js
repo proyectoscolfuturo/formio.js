@@ -1,13 +1,17 @@
-import Promise from 'native-promise-only';
-
+import NativePromise from 'native-promise-only';
+import { setXhrHeaders } from './xhr';
 const dropbox = (formio) => ({
-  uploadFile(file, fileName, dir, progressCallback) {
-    return new Promise(((resolve, reject) => {
+  uploadFile(file, fileName, dir, progressCallback, url, options, fileKey, groupPermissions, groupId, abortCallback) {
+    return new NativePromise(((resolve, reject) => {
       // Send the file with data.
       const xhr = new XMLHttpRequest();
 
       if (typeof progressCallback === 'function') {
         xhr.upload.onprogress = progressCallback;
+      }
+
+      if (typeof abortCallback === 'function') {
+        abortCallback(() => xhr.abort());
       }
 
       const fd = new FormData();
@@ -27,6 +31,8 @@ const dropbox = (formio) => ({
           response.storage = 'dropbox';
           response.size = file.size;
           response.type = file.type;
+          response.groupId = groupId;
+          response.groupPermissions = groupPermissions;
           response.url = response.path_lower;
           resolve(response);
         }
@@ -38,6 +44,9 @@ const dropbox = (formio) => ({
       xhr.onabort = reject;
 
       xhr.open('POST', `${formio.formUrl}/storage/dropbox`);
+
+      setXhrHeaders(formio, xhr);
+
       const token = formio.getToken();
       if (token) {
         xhr.setRequestHeader('x-jwt-token', token);
@@ -49,7 +58,7 @@ const dropbox = (formio) => ({
     const token = formio.getToken();
     file.url =
       `${formio.formUrl}/storage/dropbox?path_lower=${file.path_lower}${token ? `&x-jwt-token=${token}` : ''}`;
-    return Promise.resolve(file);
+    return NativePromise.resolve(file);
   }
 });
 

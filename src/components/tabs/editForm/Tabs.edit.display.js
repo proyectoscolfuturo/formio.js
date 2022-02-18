@@ -1,10 +1,43 @@
 export default [
   {
+    key: 'labelPosition',
+    ignore: true
+  },
+  {
+    key: 'placeholder',
+    ignore: true
+  },
+  {
+    key: 'description',
+    ignore: true
+  },
+  {
+    key: 'autofocus',
+    ignore: true
+  },
+  {
+    key: 'tooltip',
+    ignore: true
+  },
+  {
+    key: 'tabindex',
+    ignore: true
+  },
+  {
+    key: 'disabled',
+    ignore: true
+  },
+  {
+    key: 'tableView',
+    ignore: true
+  },
+  {
     key: 'components',
     type: 'datagrid',
     input: true,
     label: 'Tabs',
     weight: 50,
+    reorder: true,
     components: [
       {
         type: 'textfield',
@@ -21,5 +54,13 @@ export default [
         calculateValue: { _camelCase: [{ var: 'row.label' }] }
       }
     ]
-  }
+  },
+  {
+    weight: 1100,
+    type: 'checkbox',
+    label: 'Vertical Layout',
+    tooltip: 'Make this field display in vertical orientation.',
+    key: 'verticalLayout',
+    input: true
+  },
 ];

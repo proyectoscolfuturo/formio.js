@@ -96,7 +96,12 @@ Formio.createForm(document.getElementById('json-values'), {
       key: "selectjson",
       placeholder: "Select one",
       data: {
-        json: '[{"value":"a","label":"A"},{"value":"b","label":"B"},{"value":"c","label":"C"},{"value":"d","label":"D"}]'
+        json: `[
+          {"value":"a","label":"A"},
+          {"value":"b","label":"B"},
+          {"value":"c","label":"C"},
+          {"value":"d","label":"D"}
+        ]`
       },
       dataSrc: "json",
       template: "<span>{% raw %}{{ item.label }}{% endraw %}</span>",
@@ -115,7 +120,12 @@ Formio.createForm(document.getElementById('json-values'), {
             key: "selectjson",
             placeholder: "Select one",
             data: {
-              json: '[{"value":"a","label":"A"},{"value":"b","label":"B"},{"value":"c","label":"C"},{"value":"d","label":"D"}]'
+              json: '[' +
+                '{"value":"a","label":"A"},' +
+                '{"value":"b","label":"B"},' + 
+                '{"value":"c","label":"C"},' +
+                '{"value":"d","label":"D"}' +
+              ']'
             },
             dataSrc: "json",
             template: "<span>{% raw %}{{ item.label }}{% endraw %}</span>",
@@ -213,6 +223,7 @@ Formio.createForm(document.getElementById('url-select'), {
       placeholder: 'Select your model',
       dataSrc: 'url',
       defaultValue: 'Pilot',
+      lazyLoad: false,
       data: {
         url: 'https://vpic.nhtsa.dot.gov/api/vehicles/getmodelsformake/honda?format=json'
       },
@@ -234,6 +245,7 @@ Formio.createForm(document.getElementById('url-select'), {
             placeholder: 'Select your model',
             dataSrc: 'url',
             defaultValue: 'Pilot',
+            lazyLoad: false,
             data: {
               url: 'https://vpic.nhtsa.dot.gov/api/vehicles/getmodelsformake/honda?format=json'
             },
@@ -244,6 +256,53 @@ Formio.createForm(document.getElementById('url-select'), {
         </script>
       </td>
     </tr>
+    <tr>
+        <td>
+            <strong>Infinite Scroll</strong>  
+            <p>When using the Resource or URL type of select fields, it will automatically paginate the URL as they user is scrolling down the select list. this is commonly referred to as <strong>Infinite Scroll</strong>. When using the Resource component, this will automatically work, but for URL type of selects, you can add tokens {% raw %}{{ limit }}, {{ skip }}, or {{ page }}{% endraw %} to pass to your URL.</p> 
+    {% highlight js %} 
+    Formio.createForm(document.getElementById('lazy-load'), {
+      components: [
+        {
+          type: 'select',
+          label: 'Companies',
+          key: 'companies',
+          placeholder: 'Select a company',
+          dataSrc: 'url',
+          data: {
+            url: 'https://example.form.io/company/submission?limit={% raw %}{{ limit }}{% endraw %}&skip={% raw %}{{ skip }}{% endraw %}'
+          },
+          limit: 10,
+          valueProperty: 'data.name',
+          searchField: 'data.name__regex',
+          lazyLoad: true,
+          template: '<span>{% raw %}{{ item.data.name }}{% endraw %}</span>'
+        }
+      ]
+    });
+    {% endhighlight %}
+          </td>
+          <td>
+            <div id="infinite-scroll"></div>
+            <script type="text/javascript">
+              createSelectForm('infinite-scroll', {
+                type: 'select',
+                label: 'Companies',
+                key: 'companies',
+                placeholder: 'Select a company',
+                dataSrc: 'url',
+                data: {
+                  url: 'https://example.form.io/company/submission?limit={% raw %}{{ limit }}{% endraw %}&skip={% raw %}{{ skip }}{% endraw %}'
+                },
+                limit: 10,
+                valueProperty: 'data.name',
+                searchField: 'data.name',
+                lazyLoad: true,
+                template: '<span>{% raw %}{{ item.data.name }}{% endraw %}</span>'
+              });
+            </script>
+          </td>
+        </tr>
     <tr>
       <td>
         <strong>Lazy Loading</strong>  
@@ -310,7 +369,7 @@ Formio.createForm(document.getElementById('lazy-load'), {
         url: 'https://examples.form.io/customer/submission'
       },
       valueProperty: 'data.email',
-      searchField: 'data.email',
+      searchField: 'data.email__regex',
       lazyLoad: true,
       template: '<span>{% raw %}{{ item.data.firstName }} {{ item.data.lastName }}{% endraw %}</span>'
     }

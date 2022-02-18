@@ -1,4 +1,28 @@
-import baseEditForm from '../base/Base.form';
+import Components from '../Components';
+import HiddenEditDisplay from './editForm/Hidden.edit.display';
+import HiddenEditData from './editForm/Hidden.edit.data';
+
 export default function(...extend) {
-  return baseEditForm(...extend);
+  return Components.baseEditForm([
+    {
+      key: 'display',
+      components: HiddenEditDisplay
+    },
+    {
+      key: 'data',
+      components: HiddenEditData
+    },
+    {
+      key: 'validation',
+      ignore: true
+    },
+    {
+      key: 'conditional',
+      ignore: true
+    },
+    {
+      key: 'addons',
+      ignore: true
+    },
+  ], ...extend);
 }

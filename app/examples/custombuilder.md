@@ -12,9 +12,9 @@ the builder configuration.
 To see this in action, you can use the pre-built formio builder libraries as follows.
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/formiojs@latest/dist/formio.builder.min.css">
-<script src="https://unpkg.com/formiojs@latest/dist/formio.builder.min.js"></script>
-<div id="builder"></formio>
+<link rel="stylesheet" href="https://cdn.form.io/formiojs/formio.full.min.css">
+<script src="https://cdn.form.io/formiojs/formio.full.min.js"></script>
+<div id="builder"></div>
 ```
 
 ```js
@@ -41,7 +41,7 @@ Formio.builder(document.getElementById('builder'), {}, {
         firstName: {
           title: 'First Name',
           key: 'firstName',
-          icon: 'fa fa-terminal',
+          icon: 'terminal',
           schema: {
             label: 'First Name',
             type: 'textfield',
@@ -52,7 +52,7 @@ Formio.builder(document.getElementById('builder'), {}, {
         lastName: {
           title: 'Last Name',
           key: 'lastName',
-          icon: 'fa fa-terminal',
+          icon: 'terminal',
           schema: {
             label: 'Last Name',
             type: 'textfield',
@@ -63,7 +63,7 @@ Formio.builder(document.getElementById('builder'), {}, {
         email: {
           title: 'Email',
           key: 'email',
-          icon: 'fa fa-at',
+          icon: 'at',
           schema: {
             label: 'Email',
             type: 'email',
@@ -74,7 +74,7 @@ Formio.builder(document.getElementById('builder'), {}, {
         phoneNumber: {
           title: 'Mobile Phone',
           key: 'mobilePhone',
-          icon: 'fa fa-phone-square',
+          icon: 'phone-square',
           schema: {
             label: 'Mobile Phone',
             type: 'phoneNumber',
@@ -132,7 +132,7 @@ Formio.builder(document.getElementById('builder'), {}, {
         firstName: {
           title: 'First Name',
           key: 'firstName',
-          icon: 'fa fa-terminal',
+          icon: 'terminal',
           schema: {
             label: 'First Name',
             type: 'textfield',
@@ -143,7 +143,7 @@ Formio.builder(document.getElementById('builder'), {}, {
         lastName: {
           title: 'Last Name',
           key: 'lastName',
-          icon: 'fa fa-terminal',
+          icon: 'terminal',
           schema: {
             label: 'Last Name',
             type: 'textfield',
@@ -154,7 +154,7 @@ Formio.builder(document.getElementById('builder'), {}, {
         email: {
           title: 'Email',
           key: 'email',
-          icon: 'fa fa-at',
+          icon: 'at',
           schema: {
             label: 'Email',
             type: 'email',
@@ -165,7 +165,7 @@ Formio.builder(document.getElementById('builder'), {}, {
         phoneNumber: {
           title: 'Mobile Phone',
           key: 'mobilePhone',
-          icon: 'fa fa-phone-square',
+          icon: 'phone-square',
           schema: {
             label: 'Mobile Phone',
             type: 'phoneNumber',

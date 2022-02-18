@@ -158,21 +158,28 @@ export default {
   },
   tests: {
     'Test hidden components'(form, done) {
-      Harness.testElements(form, 'input[type="text"]', 4);
+      Harness.testElements(form, 'input[type="text"]', 1);
       Harness.testConditionals(form, {data: {}}, ['typeMe', 'typeThe', 'typeMonkey', 'monkey'], done);
     },
     'Test validation errors on typeShow field'(form, done) {
-      Harness.testErrors(form, {data: {
-        typeShow: 'sho',
-        typeMe: '',
-        typeThe: '',
-        typeMonkey: ''
-      }}, [
+      Harness.testErrors(
+        form,
         {
-          component: 'typeShow',
-          message: 'You must type "Show"'
-        }
-      ], done);
+          data: {
+            typeShow: 'sho',
+            typeMe: '',
+            typeThe: '',
+            typeMonkey: ''
+          }
+        },
+        [
+          {
+            component: 'typeShow',
+            message: 'You must type "Show"'
+          }
+        ],
+        done
+      );
     },
     'Test validation errors on typeMe field'(form, done) {
       Harness.testErrors(form, {data: {
@@ -249,4 +256,3 @@ export default {
     }
   }
 };
-

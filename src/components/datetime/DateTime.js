@@ -1,8 +1,11 @@
 import _ from 'lodash';
-import BaseComponent from '../base/Base';
-export default class DateTimeComponent extends BaseComponent {
+import moment from 'moment';
+import Input from '../_classes/input/Input';
+import FormioUtils from '../../utils';
+
+export default class DateTimeComponent extends Input {
   static schema(...extend) {
-    return BaseComponent.schema({
+    return Input.schema({
       type: 'datetime',
       label: 'Date / Time',
       key: 'dateTime',
@@ -11,6 +14,7 @@ export default class DateTimeComponent extends BaseComponent {
       allowInput: true,
       enableDate: true,
       enableTime: true,
+      defaultValue: '',
       defaultDate: '',
       displayInTimezone: 'viewer',
       timezone: '',
@@ -33,7 +37,8 @@ export default class DateTimeComponent extends BaseComponent {
         readonlyInput: false,
         mousewheel: true,
         arrowkeys: true
-      }
+      },
+      customOptions: {},
     }, ...extend);
   }
 
@@ -41,8 +46,8 @@ export default class DateTimeComponent extends BaseComponent {
     return {
       title: 'Date / Time',
       group: 'advanced',
-      icon: 'fa fa-calendar-plus-o',
-      documentation: 'http://help.form.io/userguide/#datetime',
+      icon: 'calendar',
+      documentation: '/userguide/#datetime',
       weight: 40,
       schema: DateTimeComponent.schema()
     };
@@ -67,27 +72,43 @@ export default class DateTimeComponent extends BaseComponent {
       this.component.format = this.component.format.replace(/HH:mm$/g, 'hh:mm a');
     }
 
+    let customOptions = this.component.customOptions || {};
+
+    if (typeof customOptions === 'string') {
+      try {
+        customOptions = JSON.parse(customOptions);
+      }
+      catch (err) {
+        console.warn(err.message);
+        customOptions = {};
+      }
+    }
+
     /* eslint-disable camelcase */
     this.component.widget = {
       type: 'calendar',
       timezone,
       displayInTimezone: _.get(this.component, 'displayInTimezone', 'viewer'),
       submissionTimezone: this.submissionTimezone,
-      language: this.options.language,
+      locale: this.options.language,
       useLocaleSettings: _.get(this.component, 'useLocaleSettings', false),
       allowInput: _.get(this.component, 'allowInput', true),
-      mode: this.component.multiple ? 'multiple' : 'single',
+      mode: 'single',
       enableTime: _.get(this.component, 'enableTime', true),
       noCalendar: !_.get(this.component, 'enableDate', true),
       format: this.component.format,
-      defaultDate: this.component.defaultDate,
       hourIncrement: _.get(this.component, 'timePicker.hourStep', 1),
       minuteIncrement: _.get(this.component, 'timePicker.minuteStep', 5),
       time_24hr: time24hr,
       readOnly: this.options.readOnly,
       minDate: _.get(this.component, 'datePicker.minDate'),
+      locale:  _.get(this.copmponent, 'datePicker.locale'),
+      disabledDates: _.get(this.component, 'datePicker.disable'),
+      disableWeekends: _.get(this.component, 'datePicker.disableWeekends'),
+      disableWeekdays: _.get(this.component, 'datePicker.disableWeekdays'),
+      disableFunction: _.get(this.component, 'datePicker.disableFunction'),
       maxDate: _.get(this.component, 'datePicker.maxDate'),
-      locale:  _.get(this.copmponent, 'datePicker.locale')
+      ...customOptions,
     };
     /* eslint-enable camelcase */
 
@@ -96,7 +117,7 @@ export default class DateTimeComponent extends BaseComponent {
   }
 
   performInputMapping(input) {
-    if (input.widget && this.widget.settings) {
+    if (input.widget && input.widget.settings) {
       input.widget.settings.submissionTimezone = this.submissionTimezone;
     }
     return input;
@@ -106,19 +127,57 @@ export default class DateTimeComponent extends BaseComponent {
     return DateTimeComponent.schema();
   }
 
+  get defaultValue() {
+    let defaultValue = super.defaultValue;
+    if (!defaultValue && this.component.defaultDate) {
+      defaultValue = FormioUtils.getDateSetting(this.component.defaultDate);
+      defaultValue = defaultValue ? defaultValue.toISOString() : '';
+    }
+    return defaultValue;
+  }
+
   get emptyValue() {
     return '';
   }
 
-  isEmpty(value) {
+  get momentFormat() {
+    return FormioUtils.convertFormatToMoment(this.component.format);
+  }
+
+  isEmpty(value = this.dataValue) {
     if (value && (value.toString() === 'Invalid Date')) {
       return true;
     }
     return super.isEmpty(value);
   }
 
-  // This select component can handle multiple items on its own.
+  formatValue(input) {
+    const result = moment.utc(input).toISOString();
+    return result === 'Invalid date' ? input : result;
+  }
+
+  isEqual(valueA, valueB = this.dataValue) {
+    return (this.isEmpty(valueA) && this.isEmpty(valueB))
+      || moment.utc(valueA).format(this.momentFormat) === moment.utc(valueB).format(this.momentFormat);
+  }
+
   createWrapper() {
     return false;
+  }
+
+  checkValidity(data, dirty, rowData) {
+    if (this.refs.input) {
+      this.refs.input.forEach((input) => {
+        if (input.widget && input.widget.enteredDate) {
+          dirty = true;
+        }
+      });
+    }
+    return super.checkValidity(data, dirty, rowData);
+  }
+
+  getValueAsString(value) {
+    const format = FormioUtils.convertFormatToMoment(this.component.format);
+    return (value ? moment(value).format(format) : value) || '';
   }
 }

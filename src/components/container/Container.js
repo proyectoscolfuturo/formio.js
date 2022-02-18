@@ -1,16 +1,20 @@
 import _ from 'lodash';
-import NestedComponent from '../nested/NestedComponent';
-import BaseComponent from '../base/Base';
+import { getFocusableElements } from '../../utils/utils';
 
-export default class ContainerComponent extends NestedComponent {
+import Component from '../_classes/component/Component';
+import Field from '../_classes/field/Field';
+import NestedDataComponent from '../_classes/nesteddata/NestedDataComponent';
+
+export default class ContainerComponent extends NestedDataComponent {
   static schema(...extend) {
-    return NestedComponent.schema({
+    return NestedDataComponent.schema({
       label: 'Container',
       type: 'container',
       key: 'container',
       clearOnHide: true,
       input: true,
       tree: true,
+      hideLabel: true,
       components: []
     }, ...extend);
   }
@@ -18,70 +22,76 @@ export default class ContainerComponent extends NestedComponent {
   static get builderInfo() {
     return {
       title: 'Container',
-      icon: 'fa fa-folder-open',
+      icon: 'folder-open',
       group: 'data',
-      documentation: 'http://help.form.io/userguide/#container',
+      documentation: '/userguide/#container',
       weight: 10,
       schema: ContainerComponent.schema()
     };
   }
 
-  constructor(component, options, data) {
-    super(component, options, data);
+  constructor(...args) {
+    super(...args);
     this.type = 'container';
+  }
+
+  addComponents(data, options) {
+    return super.addComponents(this.dataValue, options);
   }
 
   get defaultSchema() {
     return ContainerComponent.schema();
   }
 
-  build(state) {
-    this.createElement();
-    const labelAtTheBottom = this.component.labelPosition === 'bottom';
-    if (!labelAtTheBottom) {
-      this.createLabel(this.element);
-    }
-    if (!this.hasValue()) {
-      this.dataValue = {};
-    }
-    this.addComponents(this.getContainer(), this.dataValue, null, state);
-    if (labelAtTheBottom) {
-      this.createLabel(this.element);
-    }
-    this.attachLogic();
-  }
-
   get emptyValue() {
     return {};
   }
 
-  hasChanged(before, after) {
-    return !_.isEqual(before, after);
+  get templateName() {
+    return 'container';
   }
 
-  getValue() {
+  componentContext() {
     return this.dataValue;
   }
 
-  updateValue(flags, value) {
-    // Intentionally skip over nested component updateValue method to keep recursive update from occurring with sub components.
-    return BaseComponent.prototype.updateValue.call(this, flags, value);
-  }
-
-  setValue(value, flags) {
-    flags = this.getFlags.apply(this, arguments);
-    if (!value || !_.isObject(value)) {
-      return;
-    }
+  setValue(value, flags = {}) {
+    let changed = false;
     const hasValue = this.hasValue();
     if (hasValue && _.isEmpty(this.dataValue)) {
       flags.noValidate = true;
     }
-    if (!hasValue) {
-      // Set the data value and then reset each component to use the new data object.
-      this.dataValue = {};
-      this.getComponents().forEach(component => (component.data = this.dataValue));
+    if (!value || !_.isObject(value) || !hasValue) {
+      changed = true;
+      this.dataValue = this.defaultValue;
     }
-    return super.setValue(value, flags);
+    changed = super.setValue(value, flags) || changed;
+    this.updateOnChange(flags, changed);
+    return changed;
+  }
+
+  checkData(data, flags, row, components) {
+    data = data || this.rootValue;
+    flags = flags || {};
+    row = row || this.data;
+    components = components && _.isArray(components) ? components : this.getComponents();
+
+    return components.reduce((valid, comp) => {
+      return comp.checkData(data, flags, this.dataValue) && valid;
+    }, Component.prototype.checkData.call(this, data, flags, row));
+  }
+
+  focus() {
+    const focusableElements = getFocusableElements(this.element);
+      if (focusableElements && focusableElements[0]) {
+        focusableElements[0].focus();
+      }
+  }
+
+  checkConditions(data, flags, row) {
+    // check conditions of parent component first, because it may influence on visibility of it's children
+    const check = Field.prototype.checkConditions.call(this, data, flags, row);
+    this.getComponents().forEach(comp => comp.checkConditions(data, flags, this.dataValue));
+    return check;
   }
 }

@@ -1,12 +1,12 @@
-import { maskInput, conformToMask } from 'vanilla-text-mask';
+import { maskInput, conformToMask } from '@formio/vanilla-text-mask';
 import _ from 'lodash';
 import { createNumberMask } from 'text-mask-addons';
-import BaseComponent from '../base/Base';
+import Input from '../_classes/input/Input';
 import { getNumberSeparators, getNumberDecimalLimit } from '../../utils/utils';
 
-export default class NumberComponent extends BaseComponent {
+export default class NumberComponent extends Input {
   static schema(...extend) {
-    return BaseComponent.schema({
+    return Input.schema({
       type: 'number',
       label: 'Number',
       key: 'number',
@@ -22,21 +22,22 @@ export default class NumberComponent extends BaseComponent {
   static get builderInfo() {
     return {
       title: 'Number',
-      icon: 'fa fa-hashtag',
+      icon: 'hashtag',
       group: 'basic',
-      documentation: 'http://help.form.io/userguide/#number',
-      weight: 10,
+      documentation: '/userguide/#number',
+      weight: 30,
       schema: NumberComponent.schema()
     };
   }
 
-  constructor(component, options, data) {
-    super(component, options, data);
+  constructor(...args) {
+    super(...args);
     this.validators = this.validators.concat(['min', 'max']);
 
-    const separators = getNumberSeparators(this.options.language);
+    const separators = getNumberSeparators(this.options.language || navigator.language);
 
     this.decimalSeparator = this.options.decimalSeparator = this.options.decimalSeparator
+      || this.options.properties?.decimalSeparator
       || separators.decimalSeparator;
 
     if (this.component.delimiter) {
@@ -44,13 +45,14 @@ export default class NumberComponent extends BaseComponent {
         console.warn("Property 'thousandsSeparator' is deprecated. Please use i18n to specify delimiter.");
       }
 
-      this.delimiter = this.options.thousandsSeparator || separators.delimiter;
+      this.delimiter = this.options.properties?.thousandsSeparator || this.options.thousandsSeparator || separators.delimiter;
     }
     else {
       this.delimiter = '';
     }
 
-    this.decimalLimit = getNumberDecimalLimit(this.component);
+    const requireDecimal = _.get(this.component, 'requireDecimal', false);
+    this.decimalLimit = getNumberDecimalLimit(this.component, requireDecimal ? 2 : 20);
 
     // Currencies to override BrowserLanguage Config. Object key {}
     if (_.has(this.options, `languageOverride.${this.options.language}`)) {
@@ -58,7 +60,16 @@ export default class NumberComponent extends BaseComponent {
       this.decimalSeparator = override.decimalSeparator;
       this.delimiter = override.delimiter;
     }
-    this.numberMask = createNumberMask({
+    this.numberMask = this.createNumberMask();
+  }
+
+  /**
+   * Creates the number mask for normal numbers.
+   *
+   * @return {*}
+   */
+  createNumberMask() {
+    return createNumberMask({
       prefix: '',
       suffix: '',
       requireDecimal: _.get(this.component, 'requireDecimal', false),
@@ -66,13 +77,32 @@ export default class NumberComponent extends BaseComponent {
       decimalSymbol: _.get(this.component, 'decimalSymbol', this.decimalSeparator),
       decimalLimit: _.get(this.component, 'decimalLimit', this.decimalLimit),
       allowNegative: _.get(this.component, 'allowNegative', true),
-      allowDecimal: _.get(this.component, 'allowDecimal',
-        !(this.component.validate && this.component.validate.integer))
+      allowDecimal: this.isDecimalAllowed(),
     });
   }
 
   get defaultSchema() {
     return NumberComponent.schema();
+  }
+
+  get defaultValue() {
+    let defaultValue = super.defaultValue;
+    if (!defaultValue && this.component.defaultValue === 0) {
+      defaultValue = this.component.defaultValue;
+    }
+
+    if (!this.component.multiple && _.isArray(defaultValue)) {
+      defaultValue = !defaultValue[0] &&  defaultValue[0] !== 0 ? null :  defaultValue[0];
+    }
+    return defaultValue;
+  }
+
+  get emptyValue() {
+    return '';
+  }
+
+  isDecimalAllowed() {
+    return _.get(this.component, 'allowDecimal', !(this.component.validate && this.component.validate.integer));
   }
 
   parseNumber(value) {
@@ -88,37 +118,49 @@ export default class NumberComponent extends BaseComponent {
   }
 
   setInputMask(input) {
-    input.setAttribute('pattern', '\\d*');
-
+    let numberPattern = '[0-9';
+    numberPattern += this.decimalSeparator || '';
+    numberPattern += this.delimiter || '';
+    numberPattern += ']*';
+    input.setAttribute('pattern', numberPattern);
     input.mask = maskInput({
       inputElement: input,
-      mask: this.numberMask
+      mask: this.numberMask,
+      shadowRoot: this.root ? this.root.shadowRoot : null,
     });
   }
 
-  elementInfo() {
-    const info = super.elementInfo();
-    info.attr.type = 'text';
-    info.attr.inputmode = 'numeric';
+  get inputInfo() {
+    const info = super.inputInfo;
+    if (this.component.mask) {
+      info.attr.type = 'password';
+    }
+    else {
+      info.attr.type = 'text';
+    }
+    info.attr.inputmode = this.isDecimalAllowed() ? 'decimal' : 'numeric';
     info.changeEvent = 'input';
     return info;
   }
 
   getValueAt(index) {
-    if (!this.inputs.length || !this.inputs[index]) {
+    if (!this.refs.input.length || !this.refs.input[index]) {
       return null;
     }
 
-    const val = this.inputs[index].value;
-
-    if (!val) {
-      return undefined;
-    }
-
-    return this.parseNumber(val);
+    const val = this.refs.input[index].value;
+    // Check if just '-' was entered
+    return val && val !== '-_' ? this.parseNumber(val) : this.emptyValue;
   }
 
-  clearInput(input) {
+  setValueAt(index, value, flags = {}) {
+    return super.setValueAt(index, this.formatValue(this.parseValue(value)), flags);
+  }
+
+  parseValue(input) {
+    if (typeof input === 'string') {
+      input = input.split(this.delimiter).join('').replace(this.decimalSeparator, '.');
+    }
     let value = parseFloat(input);
 
     if (!_.isNaN(value)) {
@@ -136,57 +178,46 @@ export default class NumberComponent extends BaseComponent {
       return `${value}${this.decimalSeparator}${_.repeat('0', this.decimalLimit)}`;
     }
     else if (this.component.requireDecimal && value && value.includes(this.decimalSeparator)) {
-      return `${value}${_.repeat('0', this.decimalLimit - value.split(this.decimalSeparator)[1].length)})}`;
+      return `${value}${_.repeat('0', this.decimalLimit - value.split(this.decimalSeparator)[1].length)}`;
     }
 
     return value;
   }
 
-  setValueAt(index, value) {
-    return super.setValueAt(index, this.formatValue(this.clearInput(value)));
-  }
-
   focus() {
-    const input = this.inputs[0];
+    const input = this.refs.input[0];
     if (input) {
-      input.focus();
+      super.focus.call(this);
       input.setSelectionRange(0, input.value.length);
     }
   }
 
   getMaskedValue(value) {
-    return conformToMask(value.toString(), this.numberMask).conformedValue;
-  }
+    value = value === null ? '0' : value.toString();
 
-  /** @override **/
-  createInput(...args) {
-    const input = super.createInput(...args);
-
-    if (this.component.requireDecimal) {
-      this.addEventListener(input, 'blur', () => {
-        const index = this.inputs.indexOf(input);
-
-        if (index !== -1) {
-          this.setValueAt(index, this.getValueAt(index));
-        }
-      });
+    if (value.includes('.') && '.'!== this.decimalSeparator) {
+      value = value.replace('.', this.decimalSeparator);
     }
 
-    return input;
+    return conformToMask(this.formatValue(value), this.numberMask).conformedValue;
   }
 
-  getView(value) {
+  getValueAsString(value, options) {
     if (!value && value !== 0) {
       return '';
     }
-    const widget = this.widget;
-    if (widget && widget.getView) {
-      return widget.getView(value);
-    }
-
+    value = this.getWidgetValueAsString(value, options);
     if (Array.isArray(value)) {
       return value.map(this.getMaskedValue).join(', ');
     }
     return this.getMaskedValue(value);
+  }
+
+  addFocusBlurEvents(element) {
+    super.addFocusBlurEvents(element);
+
+    this.addEventListener(element, 'blur', () => {
+      element.value = this.getValueAsString(this.formatValue(this.parseValue(element.value)));
+    });
   }
 }

@@ -1,12 +1,25 @@
-import baseEditForm from '../base/Base.form';
-
+import Components from '../Components';
+import RadioEditData from './editForm/Radio.edit.data';
 import RadioEditDisplay from './editForm/Radio.edit.display';
+import RadioEditValidation from './editForm/Radio.edit.validation';
 
 export default function(...extend) {
-  return baseEditForm([
+  return Components.baseEditForm([
     {
       key: 'display',
       components: RadioEditDisplay
-    }
+    },
+    {
+      key: 'data',
+      components: RadioEditData
+    },
+    {
+      key: 'validation',
+      components: RadioEditValidation
+    },
+    {
+      key: 'addons',
+      ignore: true
+    },
   ], ...extend);
 }

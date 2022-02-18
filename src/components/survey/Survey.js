@@ -1,10 +1,10 @@
 import _ from 'lodash';
-import BaseComponent from '../base/Base';
+import Field from '../_classes/field/Field';
 import { boolValue } from '../../utils/utils';
 
-export default class SurveyComponent extends BaseComponent {
+export default class SurveyComponent extends Field {
   static schema(...extend) {
-    return BaseComponent.schema({
+    return Field.schema({
       type: 'survey',
       label: 'Survey',
       key: 'survey',
@@ -17,9 +17,9 @@ export default class SurveyComponent extends BaseComponent {
     return {
       title: 'Survey',
       group: 'advanced',
-      icon: 'fa fa-list',
-      weight: 170,
-      documentation: 'http://help.form.io/userguide/#survey',
+      icon: 'list',
+      weight: 110,
+      documentation: '/userguide/#survey',
       schema: SurveyComponent.schema()
     };
   }
@@ -28,100 +28,76 @@ export default class SurveyComponent extends BaseComponent {
     return SurveyComponent.schema();
   }
 
-  build() {
-    if (this.viewOnly) {
-      this.viewOnlyBuild();
-    }
-    else {
-      this.createElement();
-      const labelAtTheBottom = this.component.labelPosition === 'bottom';
-      if (!labelAtTheBottom) {
-        this.createLabel(this.element);
-      }
-      this.table = this.ce('table', {
-        class: 'table table-striped table-bordered'
-      });
-      this.setInputStyles(this.table);
-
-      // Build header.
-      const thead = this.ce('thead');
-      const thr = this.ce('tr');
-      thr.appendChild(this.ce('td'));
-      _.each(this.component.values, (value) => {
-        const th = this.ce('th', {
-          style: 'text-align: center;'
-        });
-        th.appendChild(this.text(value.label));
-        thr.appendChild(th);
-      });
-      thead.appendChild(thr);
-      this.table.appendChild(thead);
-      // Build the body.
-      const tbody = this.ce('tbody');
-      _.each(this.component.questions, (question) => {
-        const tr = this.ce('tr');
-        const td = this.ce('td');
-        td.appendChild(this.text(question.label));
-        tr.appendChild(td);
-        _.each(this.component.values, (value) => {
-          const td = this.ce('td', {
-            style: 'text-align: center;'
-          });
-          const input = this.ce('input', {
-            type: 'radio',
-            name: this.getInputName(question),
-            value: value.value,
-            id: `${this.id}-${question.value}-${value.value}`
-          });
-          this.addInput(input, td);
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
-      this.table.appendChild(tbody);
-      this.element.appendChild(this.table);
-      this.errorContainer = this.element;
-      if (labelAtTheBottom) {
-        this.createLabel(this.element);
-      }
-      this.createDescription(this.element);
-      this.restoreValue();
-      if (this.shouldDisable) {
-        this.disabled = true;
-      }
-      this.autofocus();
-    }
-
-    this.attachLogic();
+  render() {
+    return super.render(this.renderTemplate('survey'));
   }
 
-  setValue(value, flags) {
-    flags = this.getFlags.apply(this, arguments);
+  attach(element) {
+    this.loadRefs(element, { input: 'multiple' });
+    const superAttach = super.attach(element);
+    this.refs.input.forEach((input) => {
+      if (this.disabled) {
+        input.setAttribute('disabled', 'disabled');
+      }
+      else {
+        this.addEventListener(input, 'change', () => this.updateValue(null, {
+          modified: true
+        }));
+      }
+    });
+    this.setValue(this.dataValue);
+    return superAttach;
+  }
+
+  setValue(value, flags = {}) {
     if (!value) {
-      return;
+      return false;
     }
 
     _.each(this.component.questions, (question) => {
-      _.each(this.inputs, (input) => {
+      _.each(this.refs.input, (input) => {
         if (input.name === this.getInputName(question)) {
           input.checked = (input.value === value[question.value]);
         }
       });
     });
-    this.updateValue(flags);
+
+    const changed = this.updateValue(value, flags);
+
+    if (changed && this.isHtmlRenderMode()) {
+      this.redraw();
+    }
+
+    return changed;
   }
 
   get emptyValue() {
     return {};
   }
 
+  get defaultValue() {
+    const defaultValue = super.defaultValue;
+    //support for default values created in old formio.js versions
+    if (defaultValue && !_.isObject(defaultValue) && this.component.values.some(value => value.value === defaultValue)) {
+      const adoptedDefaultValue = {};
+
+      this.component.questions.forEach(question => {
+        adoptedDefaultValue[question.value] = defaultValue;
+      });
+
+      return adoptedDefaultValue;
+    }
+
+    return defaultValue;
+  }
+
   getValue() {
-    if (this.viewOnly) {
+    if (this.viewOnly || !this.refs.input || !this.refs.input.length) {
       return this.dataValue;
     }
     const value = {};
     _.each(this.component.questions, (question) => {
-      _.each(this.inputs, (input) => {
+      _.each(this.refs.input, (input) => {
         if (input.checked && (input.name === this.getInputName(question))) {
           value[question.value] = input.value;
           return false;
@@ -129,6 +105,17 @@ export default class SurveyComponent extends BaseComponent {
       });
     });
     return value;
+  }
+
+  set disabled(disabled) {
+    super.disabled = disabled;
+    _.each(this.refs.input, (input) => {
+      input.disabled = true;
+    });
+  }
+
+  get disabled() {
+    return super.disabled;
   }
 
   validateRequired(setting, value) {
@@ -139,35 +126,45 @@ export default class SurveyComponent extends BaseComponent {
       result && Boolean(value[question.value]), true);
   }
 
-  getView(value) {
-    if (!value) {
-      return '';
+  getInputName(question) {
+    return `${this.options.name}[${question.value}]`;
+  }
+
+  getValueAsString(value, options) {
+    if (options?.email) {
+      let result = (`
+        <table border="1" style="width:100%">
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+      `);
+
+        _.forIn(value, (value, key) => {
+          const question = _.find(this.component.questions, ['value', key]);
+          const answer = _.find(this.component.values, ['value', value]);
+
+          if (!question || !answer) {
+            return;
+          }
+
+          result += (`
+            <tr>
+              <td style="text-align:center;padding: 5px 10px;">${question.label}</td>
+              <td style="text-align:center;padding: 5px 10px;">${answer.label}</td>
+            </tr>
+          `);
+        });
+
+        result += '</tbody></table>';
+
+        return result;
     }
-    const table = this.ce('table', {
-      class: 'table table-striped table-bordered table-condensed'
-    });
-    const tbody = this.ce('tbody');
 
-    _.each(value, (value, question) => {
-      const row = this.ce('tr');
-
-      const questionCell = this.ce('th');
-      const valueCell = this.ce('td');
-
-      const questionText = _.find(this.component.questions, ['value', question]).label;
-      const valueText = _.find(this.component.values, ['value', value]).label;
-
-      questionCell.appendChild(this.text(questionText));
-      valueCell.appendChild(this.text(valueText));
-
-      row.appendChild(questionCell);
-      row.appendChild(valueCell);
-
-      tbody.appendChild(row);
-    });
-
-    table.appendChild(tbody);
-    return table.outerHTML;
+    return super.getValueAsString(value, options);
   }
 
   getInputName(question) {

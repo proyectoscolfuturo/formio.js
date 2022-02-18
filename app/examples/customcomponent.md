@@ -7,24 +7,21 @@ lib: builder
 ---
 The Form.io renderer allows for the creation of Custom components. These can be created by extending the base components within Form.io and then registering them within the core renderer. This can be done as follows.
 
-<div class="alert alert-info">
-<p>For an <strong>ES6</strong> version of this component, check out the following - <a href="https://github.com/formio/angular-demo/blob/master/src/app/components/CheckMatrix.js">ES6 CheckMatrix</a></p>
-</div>
+For a full example of creating your own module that does this, please see the [Contributed Components](https://github.com/formio/contrib) repository. Here is an example of what a custom component looks like.
 
-```html
-<link rel="stylesheet" href="https://unpkg.com/formiojs@latest/dist/formio.full.min.css">
-<script src="https://unpkg.com/formiojs@latest/dist/formio.full.min.js"></script>
-<script type="text/javascript">
-{% raw %}
+<a class="btn btn-primary" target="_blank" href="https://github.com/formio/contrib">Go to Contributed Components Repo</a>
+
+```js
 /**
+ * This file shows how to create a custom component and register that within an Angular application.
+ *
  * Get the base component class by referencing Formio.Components.components map.
  */
-var BaseComponent = Formio.Components.components.base;
+import { Components } from 'formiojs';
+const FieldComponent = (Components as any).components.field;
+import editForm from './CheckMatrix.form';
 
 /**
- * Create a new CheckMatrixComponent "class" using ES5 class inheritance notation. 
- * https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Objects/Inheritance
- * 
  * Here we will derive from the base component which all Form.io form components derive from.
  *
  * @param component
@@ -32,149 +29,167 @@ var BaseComponent = Formio.Components.components.base;
  * @param data
  * @constructor
  */
-function CheckMatrixComponent(component, options, data) {
-  BaseComponent.prototype.constructor.call(this, component, options, data);
-}
-
-// Perform typical ES5 inheritance
-CheckMatrixComponent.prototype = Object.create(BaseComponent.prototype);
-CheckMatrixComponent.prototype.constructor = CheckMatrixComponent;
-
-/**
- * Define what the default JSON schema for this component is. We will derive from the BaseComponent
- * schema and provide our overrides to that.
- * @return {*}
- */
-CheckMatrixComponent.schema = function() {
-  return BaseComponent.schema({
-    type: 'checkmatrix',
-    numRows: 3,
-    numCols: 3
-  });
-};
-
-/**
- * Register this component to the Form Builder by providing the "builderInfo" object.
- * 
- * @type {{title: string, group: string, icon: string, weight: number, documentation: string, schema: *}}
- */
-CheckMatrixComponent.builderInfo = {
-  title: 'Check Matrix',
-  group: 'basic',
-  icon: 'fa fa-table',
-  weight: 70,
-  documentation: 'http://help.form.io/userguide/#table',
-  schema: CheckMatrixComponent.schema()
-};
-
-/**
- *  Tell the renderer how to build this component using DOM manipulation. 
- */
-CheckMatrixComponent.prototype.build = function() {
-  this.element = this.ce('div', {
-    class: 'table-responsive'
-  });
-  this.createLabel(this.element);
-
-  var tableClass = 'table ';
-  ['striped', 'bordered', 'hover', 'condensed'].forEach(function(prop) {
-    if (this.component[prop]) {
-      tableClass += `table-${prop} `;
-    }
-  }.bind(this));
-  
-  var table = this.ce('table', {
-    class: tableClass
-  });
-
-  // Build the body.
-  var tbody = this.ce('tbody');
-  this.inputs = [];
-  this.checks = [];
-  for (let i = 0; i < this.component.numRows; i++) {
-    var tr = this.ce('tr');
-    this.checks.push([]);
-    for (let j = 0; j < this.component.numCols; j++) {
-      var td = this.ce('td');
-      this.checks[i][j] = this.ce('input', {
-        type: 'checkbox'
-      });
-      this.addInput(this.checks[i][j], td);
-      tr.appendChild(td);
-    }
-    tbody.appendChild(tr);
+export default class CheckMatrix extends (FieldComponent as any) {
+  public checks: Array<Array<any>>;
+  constructor(component, options, data) {
+    super(component, options, data);
+    this.checks = [];
   }
-  table.appendChild(tbody);
-  this.element.appendChild(table);
-};
 
-/**
- * Provide the input element information. Because we are using checkboxes, the change event needs to be 
- * 'click' instead of the default 'change' from the BaseComponent.
- * 
- * @return {{type, component, changeEvent, attr}}
- */
-CheckMatrixComponent.prototype.elementInfo = function() {
-  const info = BaseComponent.prototype.elementInfo.call(this);
-  info.changeEvent = 'click';
-  return info;
-};
-
-/**
- * Tell the renderer how to "get" a value from this component.
- * 
- * @return {Array}
- */
-CheckMatrixComponent.prototype.getValue = function() {
-  var value = [];
-  for (var rowIndex in this.checks) {
-    var row = this.checks[rowIndex];
-    value[rowIndex] = [];
-    for (var colIndex in row) {
-      var col = row[colIndex];
-      value[rowIndex][colIndex] = !!col.checked;
-    }
+  static schema() {
+    return FieldComponent.schema({
+      type: 'checkmatrix',
+      numRows: 3,
+      numCols: 3
+    });
   }
-  return value;
-};
 
-/**
- * Tell the renderer how to "set" the value of this component.
- * 
- * @param value
- * @return {boolean}
- */
-CheckMatrixComponent.prototype.setValue = function(value) {
-  if (!value) {
-    return;
+  public static editForm = editForm;
+
+  static builderInfo = {
+    title: 'Check Matrix',
+    group: 'basic',
+    icon: 'fa fa-table',
+    weight: 70,
+    documentation: 'http://help.form.io/userguide/#table',
+    schema: CheckMatrix.schema()
   }
-  for (var rowIndex in this.checks) {
-    var row = this.checks[rowIndex];
-    if (!value[rowIndex]) {
-      break;
-    }
-    for (var colIndex in row) {
-      var col = row[colIndex];
-      if (!value[rowIndex][colIndex]) {
-        return false;
+
+  get tableClass() {
+    let tableClass = 'table ';
+    ['striped', 'bordered', 'hover', 'condensed'].forEach((prop) => {
+      if (this.component[prop]) {
+        tableClass += `table-${prop} `;
       }
-      let checked = value[rowIndex][colIndex] ? 1 : 0;
-      col.value = checked;
-      col.checked = checked;
+    });
+    return tableClass;
+  }
+
+  renderCell(row, col) {
+    return this.renderTemplate('input', {
+      input: {
+        type: 'input',
+        ref: `${this.component.key}-${row}`,
+        attr: {
+          id: `${this.component.key}-${row}-${col}`,
+          class: 'form-control',
+          type: 'checkbox',
+        }
+      }
+    });
+  }
+
+  public render(children) {
+    return super.render(this.renderTemplate('checkmatrix', {
+      tableClass: this.tableClass,
+      renderCell: this.renderCell.bind(this)
+    }));
+  }
+
+  /**
+   * After the html string has been mounted into the dom, the dom element is returned here. Use refs to find specific
+   * elements to attach functionality to.
+   *
+   * @param element
+   * @returns {Promise}
+   */
+  attach(element) {
+    const refs = {};
+
+    for (let i = 0; i < this.component.numRows; i++) {
+      refs[`${this.component.key}-${i}`] = 'multiple';
+    }
+
+    this.loadRefs(element, refs);
+
+    this.checks = [];
+    for (let i = 0; i < this.component.numRows; i++) {
+      this.checks[i] = Array.prototype.slice.call(this.refs[`${this.component.key}-${i}`], 0);
+
+      // Attach click events to each input in the row
+      this.checks[i].forEach(input => {
+        this.addEventListener(input, 'click', () => this.updateValue())
+      });
+    }
+
+    // Allow basic component functionality to attach like field logic and tooltips.
+    return super.attach(element);
+  }
+
+  /**
+   * Get the value of the component from the dom elements.
+   *
+   * @returns {Array}
+   */
+  getValue() {
+    var value = [];
+    for (var rowIndex in this.checks) {
+      var row = this.checks[rowIndex];
+      value[rowIndex] = [];
+      for (var colIndex in row) {
+        var col = row[colIndex];
+        value[rowIndex][colIndex] = !!col.checked;
+      }
+    }
+    return value;
+  }
+
+  /**
+   * Set the value of the component into the dom elements.
+   *
+   * @param value
+   * @returns {boolean}
+   */
+  setValue(value) {
+    if (!value) {
+      return;
+    }
+    for (var rowIndex in this.checks) {
+      var row = this.checks[rowIndex];
+      if (!value[rowIndex]) {
+        break;
+      }
+      for (var colIndex in row) {
+        var col = row[colIndex];
+        if (!value[rowIndex][colIndex]) {
+          return false;
+        }
+        let checked = value[rowIndex][colIndex] ? 1 : 0;
+        col.value = checked;
+        col.checked = checked;
+      }
     }
   }
-};
+}
+```
 
-// Use the table component edit form.
-CheckMatrixComponent.editForm = Formio.Components.components.table.editForm;
+These modules will then be compiled into a Module file that can either be imported within your own application, or using ```<script>``` tags in the browser like the following.
 
-// Register the component to the Formio.Components registry.
-Formio.Components.addComponent('checkmatrix', CheckMatrixComponent);
-{% endraw %}
-</script>
+```js
+import { Formio } from 'formiojs';
+import YourModule from './yourmodule';
+Formio.use(YourModule);
 ```
 
 ```html
+<link rel="stylesheet" href="https://cdn.form.io/formiojs/formio.full.min.css">
+<script src="https://cdn.form.io/formiojs/formio.full.min.js"></script>
+<script src="./contrib/YourModule.js"></script>
+<script type="text/javascript">
+    Formio.use(YourModule);
+</script>
+```
+
+As an example, you can import the Contributed Components into your application using the following.
+
+```html
+<link rel="stylesheet" href="https://cdn.form.io/formiojs/formio.full.min.css">
+<script src="https://cdn.form.io/formiojs/formio.full.min.js"></script>
+<script src="https://unpkg.com/@formio/contrib@latest/dist/formio-contrib.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@formio/contrib@latest/dist/formio-contrib.css">
+<script type="text/javascript">
+    Formio.use(FormioContrib);
+</script>
 <div class="card card-body bg-light">
   <div id="builder"></div>
 </div>
@@ -203,7 +218,7 @@ Formio.Components.addComponent('checkmatrix', CheckMatrixComponent);
       }
     }
   }).then(function(builder) {
-    Formio.createForm(document.getElementById('formio'), {}).then(function(instance) {
+    Formio.createForm(document.getElementById('formio'), builder.form).then(function(instance) {
       var json = document.getElementById('json');
       instance.on('change', function() {
         json.innerHTML = '';
@@ -211,6 +226,7 @@ Formio.Components.addComponent('checkmatrix', CheckMatrixComponent);
       });
       builder.on('change', function(schema) {
         if (schema.components) {
+          instance.resetValue();
           instance.form = schema;
         }
       });
@@ -220,148 +236,13 @@ Formio.Components.addComponent('checkmatrix', CheckMatrixComponent);
 ```
 
 <h3>Result</h3>
+<script src="https://unpkg.com/@formio/contrib@latest/dist/formio-contrib.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@formio/contrib@latest/dist/formio-contrib.css">
 <script type="text/javascript">
-var BaseComponent = Formio.Components.components.base;
-
-function CheckMatrixComponent(component, options, data) {
-  BaseComponent.prototype.constructor.call(this, component, options, data);
-}
-
-CheckMatrixComponent.prototype = Object.create(BaseComponent.prototype);
-CheckMatrixComponent.prototype.constructor = CheckMatrixComponent;
-
-CheckMatrixComponent.schema = function() {
-  return BaseComponent.schema({
-    type: 'checkmatrix',
-    input: true,
-    persistent: true
-  });
-};
-
-CheckMatrixComponent.builderInfo = {
-  title: 'Check Matrix',
-  group: 'basic',
-  icon: 'fa fa-table',
-  weight: 70,
-  documentation: 'http://help.form.io/userguide/#table',
-  schema: CheckMatrixComponent.schema()
-};
-
-CheckMatrixComponent.prototype.build = function() {
-  this.element = this.ce('div', {
-    class: 'table-responsive'
-  });
-  this.createLabel(this.element);
-
-  var tableClass = 'table ';
-  ['striped', 'bordered', 'hover', 'condensed'].forEach(function(prop) {
-    if (this.component[prop]) {
-      tableClass += `table-${prop} `;
-    }
-  }.bind(this));
-  
-  var table = this.ce('table', {
-    class: tableClass
-  });
-
-  // Build the body.
-  var tbody = this.ce('tbody');
-  this.inputs = [];
-  this.checks = [];
-  for (let i = 0; i < this.component.numRows; i++) {
-    var tr = this.ce('tr');
-    this.checks.push([]);
-    for (let j = 0; j < this.component.numCols; j++) {
-      var td = this.ce('td');
-      this.checks[i][j] = this.ce('input', {
-        type: 'checkbox'
-      });
-      this.addInput(this.checks[i][j], td);
-      tr.appendChild(td);
-    }
-    tbody.appendChild(tr);
-  }
-  table.appendChild(tbody);
-  this.element.appendChild(table);
-};
-
-CheckMatrixComponent.prototype.elementInfo = function() {
-  const info = BaseComponent.prototype.elementInfo.call(this);
-  info.changeEvent = 'click';
-  return info;
-};
-
-CheckMatrixComponent.prototype.getValue = function() {
-  var value = [];
-  for (var rowIndex in this.checks) {
-    var row = this.checks[rowIndex];
-    value[rowIndex] = [];
-    for (var colIndex in row) {
-      var col = row[colIndex];
-      value[rowIndex][colIndex] = !!col.checked;
-    }
-  }
-  return value;
-};
-
-CheckMatrixComponent.prototype.setValue = function(value) {
-  if (!value) {
-    return;
-  }
-  for (var rowIndex in this.checks) {
-    var row = this.checks[rowIndex];
-    if (!value[rowIndex]) {
-      break;
-    }
-    for (var colIndex in row) {
-      var col = row[colIndex];
-      if (!value[rowIndex][colIndex]) {
-        return false;
-      }
-      let checked = value[rowIndex][colIndex] ? 1 : 0;
-      col.value = checked;
-      col.checked = checked;
-    }
-  }
-};
-
-// Use the table component edit form.
-CheckMatrixComponent.editForm = Formio.Components.components.table.editForm;
-Formio.Components.addComponent('checkmatrix', CheckMatrixComponent);
+    Formio.use(FormioContrib);
 </script>
 <div class="card card-body bg-light">
-<div id="builder"></div>
-<script type="text/javascript">
-Formio.builder(document.getElementById('builder'), {}, {
-  builder: {
-    basic: false,
-    advanced: false,
-    data: false,
-    layout: false,
-    customBasic: {
-      title: 'Basic Components',
-      default: true,
-      weight: 0,
-      components: {
-        checkmatrix: true
-      }
-    }
-  }
-}).then(function(builder) {
-  Formio.createForm(document.getElementById('formio'), {}).then(function(instance) {
-    var json = document.getElementById('json');
-    instance.on('change', function() {
-      json.innerHTML = '';
-      json.appendChild(document.createTextNode(JSON.stringify(instance.submission, null, 4)));
-    });
-    builder.on('change', function(schema) {
-      if (schema.components) {
-        instance.form = schema;
-      }
-    });
-  });
-});
-</script>
+  <div id="builder"></div>
 </div>
 <h4>Rendered Form</h4>
 <div class="card card-body bg-light">
@@ -371,3 +252,35 @@ Formio.builder(document.getElementById('builder'), {}, {
 <div class="card card-body bg-light jsonviewer">
   <pre id="json"></pre>
 </div>
+<script type="text/javascript">
+  Formio.builder(document.getElementById('builder'), {}, {
+    builder: {
+      basic: false,
+      advanced: false,
+      data: false,
+      layout: false,
+      customBasic: {
+        title: 'Basic Components',
+        default: true,
+        weight: 0,
+        components: {
+          checkmatrix: true
+        }
+      }
+    }
+  }).then(function(builder) {
+    Formio.createForm(document.getElementById('formio'), builder.form).then(function(instance) {
+      var json = document.getElementById('json');
+      instance.on('change', function() {
+        json.innerHTML = '';
+        json.appendChild(document.createTextNode(JSON.stringify(instance.submission, null, 4)));
+      });
+      builder.on('change', function(schema) {
+        if (schema.components) {
+          instance.resetValue();
+          instance.form = schema;
+        }
+      });
+    });
+  });
+</script>

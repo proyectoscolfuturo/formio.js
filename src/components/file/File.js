@@ -1,10 +1,24 @@
-import BaseComponent from '../base/Base';
+import Field from '../_classes/field/Field';
 import { uniqueName } from '../../utils/utils';
 import download from 'downloadjs';
-import Formio from '../../Formio';
+import _ from 'lodash';
+import NativePromise from 'native-promise-only';
+import fileProcessor from '../../providers/processor/fileProcessor';
+
+let Camera;
+let webViewCamera = navigator.camera || Camera;
 
 // canvas.toBlob polyfill.
-if (!HTMLCanvasElement.prototype.toBlob) {
+
+let htmlCanvasElement;
+if (typeof window !== 'undefined') {
+  htmlCanvasElement = window.HTMLCanvasElement;
+}
+else if (typeof global !== 'undefined') {
+  htmlCanvasElement = global.HTMLCanvasElement;
+}
+
+if (htmlCanvasElement && !htmlCanvasElement.prototype.toBlob) {
   Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
     value: function(callback, type, quality) {
       var canvas = this;
@@ -23,9 +37,9 @@ if (!HTMLCanvasElement.prototype.toBlob) {
   });
 }
 
-export default class FileComponent extends BaseComponent {
+export default class FileComponent extends Field {
   static schema(...extend) {
-    return BaseComponent.schema({
+    return Field.schema({
       type: 'file',
       label: 'Subir',
       key: 'file',
@@ -35,46 +49,73 @@ export default class FileComponent extends BaseComponent {
       filePattern: '*',
       fileMinSize: '0KB',
       fileMaxSize: '1GB',
-      uploadOnly: false
+      uploadOnly: false,
     }, ...extend);
   }
 
   static get builderInfo() {
     return {
       title: 'File',
-      group: 'advanced',
-      icon: 'fa fa-file',
-      documentation: 'http://help.form.io/userguide/#file',
+      group: 'premium',
+      icon: 'file',
+      documentation: '/userguide/#file',
       weight: 100,
-      schema: FileComponent.schema()
+      schema: FileComponent.schema(),
     };
   }
 
-  constructor(component, options, data) {
-    super(component, options, data);
+  init() {
+    super.init();
+    webViewCamera = navigator.camera || Camera;
+    const fileReaderSupported = (typeof FileReader !== 'undefined');
+    const formDataSupported = typeof window !== 'undefined' ? Boolean(window.FormData) : false;
+    const progressSupported = (typeof window !== 'undefined' && window.XMLHttpRequest) ? ('upload' in new XMLHttpRequest) : false;
+
     this.support = {
-      filereader: typeof FileReader != 'undefined',
-      dnd: 'draggable' in document.createElement('span'),
-      formdata: !!window.FormData,
-      progress: 'upload' in new XMLHttpRequest
+      filereader: fileReaderSupported,
+      formdata: formDataSupported,
+      hasWarning: !fileReaderSupported || !formDataSupported || !progressSupported,
+      progress: progressSupported,
     };
+    // Called when our files are ready.
+    this.filesReady = new NativePromise((resolve, reject) => {
+      this.filesReadyResolve = resolve;
+      this.filesReadyReject = reject;
+    });
+    this.cameraMode = false;
+    this.statuses = [];
+    this.fileDropHidden = false;
+  }
+
+  get dataReady() {
+    return this.filesReady;
   }
 
   get defaultSchema() {
     return FileComponent.schema();
   }
 
+  loadImage(fileInfo) {
+    if (this.component.privateDownload) {
+      fileInfo.private = true;
+    }
+    return this.fileService.downloadFile(fileInfo).then((result) => result.url);
+  }
+
   get emptyValue() {
     return [];
   }
 
-  getValue() {
-    return this.dataValue;
+  getValueAsString(value) {
+    if (_.isArray(value)) {
+      return _.map(value, 'originalName').join(', ');
+    }
+
+    return _.get(value, 'originalName', '');
   }
 
-  setValue(value) {
-    this.dataValue = value || [];
-    this.refreshDOM();
+  getValue() {
+    return this.dataValue;
   }
 
   get defaultValue() {
@@ -89,472 +130,370 @@ export default class FileComponent extends BaseComponent {
       (this.component.fileTypes[0].label !== '' || this.component.fileTypes[0].value !== '');
   }
 
-  // File is always an array.
-  validateMultiple() {
-    return false;
+  get fileDropHidden() {
+    return this._fileBrowseHidden;
   }
 
-  build() {
-    // Restore the value.
-    this.restoreValue();
-
-    const labelAtTheBottom = this.component.labelPosition === 'bottom';
-
-    this.createElement();
-    if (!labelAtTheBottom) {
-      this.createLabel(this.element);
+  set fileDropHidden(value) {
+    if (typeof value !== 'boolean' || this.component.multiple) {
+      return;
     }
-    this.inputsContainer = this.ce('div');
-    this.errorContainer = this.inputsContainer;
-    this.createErrorElement();
-    this.listContainer = this.buildList();
-    this.inputsContainer.appendChild(this.listContainer);
-    this.uploadContainer = this.buildUpload();
-    this.hiddenFileInputElement = this.buildHiddenFileInput();
-    this.hook('input', this.hiddenFileInputElement, this.inputsContainer);
-    this.inputsContainer.appendChild(this.hiddenFileInputElement);
-    this.inputsContainer.appendChild(this.uploadContainer);
-    this.addWarnings(this.inputsContainer);
-    this.buildUploadStatusList(this.inputsContainer);
-    this.setInputStyles(this.inputsContainer);
-    this.element.appendChild(this.inputsContainer);
-    if (labelAtTheBottom) {
-      this.createLabel(this.element);
-    }
-    this.createDescription(this.element);
-    this.autofocus();
-
-    // Disable if needed.
-    if (this.shouldDisable) {
-      this.disabled = true;
-    }
-    this.attachLogic();
+    this._fileBrowseHidden = value;
   }
 
-  refreshDOM() {
-    // Don't refresh before the initial render.
-    if (this.listContainer && this.uploadContainer) {
-      // Refresh file list.
-      const newList = this.buildList();
-      this.inputsContainer.replaceChild(newList, this.listContainer);
-      this.listContainer = newList;
-
-      // Refresh upload container.
-      const newUpload = this.buildUpload();
-      this.inputsContainer.replaceChild(newUpload, this.uploadContainer);
-      this.uploadContainer = newUpload;
-    }
+  render() {
+    return super.render(this.renderTemplate('file', {
+      fileSize: this.fileSize,
+      files: this.dataValue || [],
+      statuses: this.statuses,
+      disabled: this.disabled,
+      support: this.support,
+      fileDropHidden: this.fileDropHidden
+    }));
   }
 
-  buildList() {
-    if (this.component.image) {
-      return this.buildImageList();
-    }
-    else {
-      return this.buildFileList();
-    }
-  }
-
-  buildFileList() {
-    return this.ce('ul', { class: 'list-group list-group-striped' }, [
-      this.ce('li', { class: 'list-group-item list-group-header hidden-xs hidden-sm' },
-        this.ce('div', { class: 'row' },
-          [
-            this.ce('div', { class: 'col-md-1' }),
-            this.ce('div', { class: `col-md-${this.hasTypes ? '7' : '9'}` },
-              this.ce('strong', {}, this.text('Nombre de archivo'))
-            ),
-            this.ce('div', { class: 'col-md-2' },
-              this.ce('strong', {}, this.text('Tamaño'))
-            ),
-            this.hasTypes ?
-              this.ce('div', { class: 'col-md-2' }, this.ce('strong', {}, this.text('Tipo'))): null,
-          ]
-        )
-      ),
-      this.dataValue.map((fileInfo, index) => this.createFileListItem(fileInfo, index))
-    ]);
-  }
-
-  buildHiddenFileInput() {
-    // Input needs to be in DOM and "visible" (opacity 0 is fine) for IE to display file dialog.
-    return this.ce('input', {
-      type: 'file',
-      style: 'opacity: 0; position: absolute;',
-      tabindex: -1, // prevent focus
-      onChange: () => {
-        this.upload(this.hiddenFileInputElement.files);
-        this.hiddenFileInputElement.value = '';
-      }
+  getVideoStream(constraints) {
+    return navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { min: 640, ideal: 1920 },
+        height: { min: 360, ideal: 1080 },
+        aspectRatio: { ideal: 16 / 9 },
+        ...constraints,
+      },
+      audio: false,
     });
   }
 
-  createFileListItem(fileInfo, index) {
-    const fileService = this.fileService;
-    return this.ce('li', { class: 'list-group-item' },
-      this.ce('div', { class: 'row' },
-        [
-          this.ce('div', { class: 'col-md-1' },
-            (
-              (!this.disabled && !this.shouldDisable) ?
-                this.ce('i', {
-                  class: this.iconClass('remove'),
-                  onClick: event => {
-                    if (fileInfo && (this.component.storage === 'url')) {
-                      fileService.makeRequest('', fileInfo.url, 'delete');
-                    }
-                    event.preventDefault();
-                    this.splice(index);
-                    this.refreshDOM();
-                  }
-                }) :
-                null
-            )
-          ),
-          this.ce('div', { class: `col-md-${this.hasTypes ? '7' : '9'}` }, this.createFileLink(fileInfo)),
-          this.ce('div', { class: 'col-md-2' }, this.fileSize(fileInfo.size)),
-          this.hasTypes ?
-            this.ce('div', { class: 'col-md-2' }, this.createTypeSelect(fileInfo)): null,
-        ]
-      )
-    );
+  stopVideoStream(videoStream) {
+    videoStream.getVideoTracks().forEach((track) => track.stop());
   }
 
-  createFileLink(file) {
-    if (this.options.uploadOnly) {
-      return file.originalName || file.name;
-    }
-    return this.ce('a', {
-      href: file.url, target: '_blank',
-      onClick: this.getFile.bind(this, file)
-    }, file.originalName || file.name);
-  }
-
-  createTypeSelect(file) {
-    return this.ce('select', {
-      class: 'file-type',
-      onChange: (event) => {
-        file.fileType = event.target.value;
-        this.triggerChange();
-      }
-    }, this.component.fileTypes.map(type => this.ce('option', {
-          value: type.value,
-          class: 'test',
-          selected: type.value === file.fileType ? 'selected' : undefined,
-        }, type.label)
-      )
-    );
-  }
-
-  buildImageList() {
-    return this.ce('div', {},
-      this.dataValue.map((fileInfo, index) => this.createImageListItem(fileInfo, index))
-    );
-  }
-
-  get fileService() {
-    if (this.options.fileService) {
-      return this.options.fileService;
-    }
-    if (this.options.formio) {
-      return this.options.formio;
-    }
-    if (this.root && this.root.formio) {
-      return this.root.formio;
-    }
-    return new Formio();
-  }
-
-  createImageListItem(fileInfo, index) {
-    let image;
-
-    const fileService = this.fileService;
-    if (fileService) {
-      fileService.downloadFile(fileInfo)
-        .then(result => {
-          image.src = result.url;
-        });
-    }
-    return this.ce('div', {},
-      this.ce('span', {},
-        [
-          image = this.ce('img', {
-            src: '',
-            alt: fileInfo.originalName || fileInfo.name,
-            style: `width:${this.component.imageSize}px`
-          }),
-          (
-            !this.disabled ?
-              this.ce('i', {
-                class: this.iconClass('remove'),
-                onClick: event => {
-                  if (fileInfo && (this.component.storage === 'url')) {
-                    fileService.makeRequest('', fileInfo.url, 'delete');
-                  }
-                  event.preventDefault();
-                  this.splice(index);
-                  this.refreshDOM();
-                }
-              }) :
-              null
-          )
-        ]
-      )
-    );
+  getFrame(videoPlayer) {
+    return new NativePromise((resolve) => {
+      const canvas = document.createElement('canvas');
+      canvas.height = videoPlayer.videoHeight;
+      canvas.width = videoPlayer.videoWidth;
+      const context = canvas.getContext('2d');
+      context.drawImage(videoPlayer, 0, 0);
+      canvas.toBlob(resolve);
+    });
   }
 
   startVideo() {
-    navigator.getMedia = (navigator.getUserMedia ||
-      navigator.webkitGetUserMedia ||
-      navigator.mozGetUserMedia ||
-      navigator.msGetUserMedia);
+    this.getVideoStream()
+      .then((stream) => {
+        this.videoStream = stream;
 
-    navigator.getMedia(
-      {
-        video: {
-          width: { min: 640, ideal: 1920 },
-          height: { min: 400, ideal: 1080 },
-          aspectRatio: { ideal: 1.7777777778 }
-        },
-        audio: false
-      },
-      (stream) => {
-        if (navigator.mozGetUserMedia) {
-          this.video.mozSrcObject = stream;
+        const { videoPlayer } = this.refs;
+        if (!videoPlayer) {
+          console.warn('Video player not found in template.');
+          this.cameraMode = false;
+          this.redraw();
+          return;
         }
-        else {
-          this.video.srcObject = stream;
-        }
+
+        videoPlayer.srcObject = stream;
         const width = parseInt(this.component.webcamSize) || 320;
-        this.video.setAttribute('width', width);
-        this.video.play();
-      },
-      (err) => {
-        console.log(err);
-      }
-    );
+        videoPlayer.setAttribute('width', width);
+        videoPlayer.play();
+      })
+      .catch((err) => {
+        console.error(err);
+        this.cameraMode = false;
+        this.redraw();
+      });
+  }
+
+  stopVideo() {
+    if (this.videoStream) {
+      this.stopVideoStream(this.videoStream);
+      this.videoStream = null;
+    }
   }
 
   takePicture() {
-    this.canvas.setAttribute('width', this.video.videoWidth);
-    this.canvas.setAttribute('height', this.video.videoHeight);
-    this.canvas.getContext('2d').drawImage(this.video, 0, 0);
-    this.canvas.toBlob(blob => {
-      blob.name = `photo-${Date.now()}.png`;
-      this.upload([blob]);
+    const { videoPlayer } = this.refs;
+    if (!videoPlayer) {
+      console.warn('Video player not found in template.');
+      this.cameraMode = false;
+      this.redraw();
+      return;
+    }
+
+    this.getFrame(videoPlayer)
+      .then((frame) => {
+        frame.name = `photo-${Date.now()}.png`;
+        this.upload([frame]);
+        this.cameraMode = false;
+        this.redraw();
+      });
+  }
+
+  browseFiles(attrs = {}) {
+    return new NativePromise((resolve) => {
+      const fileInput = this.ce('input', {
+        type: 'file',
+        style: 'height: 0; width: 0; visibility: hidden;',
+        tabindex: '-1',
+        ...attrs,
+      });
+      document.body.appendChild(fileInput);
+
+      fileInput.addEventListener('change', () => {
+        resolve(fileInput.files);
+        document.body.removeChild(fileInput);
+      }, true);
+
+      // There is no direct way to trigger a file dialog. To work around this, create an input of type file and trigger
+      // a click event on it.
+      if (typeof fileInput.trigger === 'function') {
+        fileInput.trigger('click');
+      }
+      else {
+        fileInput.click();
+      }
     });
   }
 
-  buildUpload() {
-    // Drop event must change this pointer so need a reference to parent this.
-    const element = this;
-    // Declare Camera Instace
-    let Camera;
-    // Implement Camera file upload for WebView Apps.
-    if (this.component.image && (navigator.camera || Camera)) {
-      const camera = navigator.camera || Camera;
-      return this.ce('div', {},
-        (
-          (!this.disabled && (this.component.multiple || this.dataValue.length === 0)) ?
-            this.ce('div', {
-                class: 'fileSelector'
-              },
-              [
-                this.ce('button', {
-                    class: 'btn btn-primary',
-                    onClick: (event) => {
-                      event.preventDefault();
-                      camera.getPicture((success) => {
-                        window.resolveLocalFileSystemURL(success, (fileEntry) => {
-                            fileEntry.file((file) => {
-                              this.upload([file]);
-                            });
-                          }
-                        );
-                      }, null, { sourceType: camera.PictureSourceType.PHOTOLIBRARY });
-                    }
-                  },
-                  [
-                    this.ce('i', { class: this.iconClass('book') }),
-                    this.text('Gallery')
-                  ]),
-                this.ce('button', {
-                    class: 'btn btn-primary',
-                    onClick: (event) => {
-                      event.preventDefault();
-                      camera.getPicture((success) => {
-                        window.resolveLocalFileSystemURL(success, (fileEntry) => {
-                            fileEntry.file((file) => {
-                              this.upload([file]);
-                            });
-                          }
-                        );
-                      }, null, {
-                        sourceType: camera.PictureSourceType.CAMERA,
-                        encodingType: camera.EncodingType.PNG,
-                        mediaType: camera.MediaType.PICTURE,
-                        saveToPhotoAlbum: true,
-                        correctOrientation: false
-                      });
-                    }
-                  },
-                  [
-                    this.ce('i', { class: this.iconClass('camera') }),
-                    this.text('Camera')
-                  ])
-              ]
-            ) :
-            this.ce('div')
-        )
-      );
-    }
+  set cameraMode(value) {
+    this._cameraMode = value;
 
-    // If this is disabled or a single value with a value, don't show the upload div.
-    const render = this.ce('div', {},
-      (
-        (!this.disabled && (this.component.multiple || this.dataValue.length === 0)) ?
-          !this.cameraMode ?
-            [
-              this.ce('div',
-                {
-                  class: 'fileSelector',
-                  onDragover(event) {
-                    this.className = 'fileSelector fileDragOver';
-                    event.preventDefault();
-                  },
-                  onDragleave(event) {
-                    this.className = 'fileSelector';
-                    event.preventDefault();
-                  },
-                  onDrop(event) {
-                    this.className = 'fileSelector';
-                    event.preventDefault();
-                    element.upload(event.dataTransfer.files);
-                    return false;
-                  }
-                },
-                [
-                  this.ce('i', { class: this.iconClass('cloud-upload') }),
-                  this.text(' '),
-                  this.text('Arrastra un archivo para adjuntar, o'),
-                  this.text(' '),
-                  this.buildBrowseLink(),
-                  this.component.webcam ?
-                    [
-                      this.text(', o'),
-                      this.text(' '),
-                      this.ce('a',
-                        {
-                          href: '#',
-                          title: 'Usar Cámara Web',
-                          onClick: (event) => {
-                            event.preventDefault();
-                            this.cameraMode = !this.cameraMode;
-                            this.refreshDOM();
-                          }
-                        },
-                        this.ce('i', { class: this.iconClass('camera') })
-                      )
-                    ] : null
-                ]
-              ),
-            ] :
-            [
-              this.ce('div',
-                {},
-                [
-                  this.video = this.ce('video', {
-                    class: 'video',
-                    autoplay: true
-                  }),
-                  this.canvas = this.ce('canvas', { style: 'display: none;' }),
-                  this.photo = this.ce('img')
-                ]
-              ),
-              this.ce('div',
-                {
-                  class: 'btn btn-primary',
-                  onClick: () => {
-                    this.takePicture();
-                  }
-                },
-                'Take Photo'
-              ),
-              this.ce('div',
-                {
-                  class: 'btn btn-default',
-                  onClick: () => {
-                    this.cameraMode = !this.cameraMode;
-                    this.refreshDOM();
-                  }
-                },
-                'Switch to file upload'
-              )
-            ]
-          :
-          this.ce('div')
-      )
-    );
-    if (this.cameraMode) {
+    if (value) {
       this.startVideo();
     }
-    return render;
+    else {
+      this.stopVideo();
+    }
   }
 
-  buildBrowseLink() {
-    this.browseLink = this.ce('a', {
-      href: '#',
-      onClick: (event) => {
+  get cameraMode() {
+    return this._cameraMode;
+  }
+
+  get useWebViewCamera() {
+    return this.imageUpload && webViewCamera;
+  }
+
+  get imageUpload() {
+    return Boolean(this.component.image);
+  }
+
+  get browseOptions() {
+    const options = {};
+
+    if (this.component.multiple) {
+      options.multiple = true;
+    }
+    //use "accept" attribute only for desktop devices because of its limited support by mobile browsers
+    if (!this.isMobile.any) {
+      const filePattern = this.component.filePattern.trim() || '';
+      const imagesPattern = 'image/*';
+
+      if (this.imageUpload && (!filePattern || filePattern === '*')) {
+        options.accept = imagesPattern;
+      }
+      else if (this.imageUpload && !filePattern.includes(imagesPattern)) {
+        options.accept = `${imagesPattern},${filePattern}`;
+      }
+      else {
+        options.accept = filePattern;
+      }
+    }
+
+    return options;
+  }
+
+  deleteFile(fileInfo) {
+    const { options = {} } = this.component;
+
+    if (fileInfo && (['url', 'indexeddb'].includes(this.component.storage))) {
+      const { fileService } = this;
+      if (fileService && typeof fileService.deleteFile === 'function') {
+        fileService.deleteFile(fileInfo, options);
+      }
+      else {
+        const formio = this.options.formio || (this.root && this.root.formio);
+
+        if (formio) {
+          formio.makeRequest('', fileInfo.url, 'delete');
+        }
+      }
+    }
+  }
+
+  attach(element) {
+    this.loadRefs(element, {
+      fileDrop: 'single',
+      fileBrowse: 'single',
+      galleryButton: 'single',
+      cameraButton: 'single',
+      takePictureButton: 'single',
+      toggleCameraMode: 'single',
+      videoPlayer: 'single',
+      fileLink: 'multiple',
+      removeLink: 'multiple',
+      fileStatusRemove: 'multiple',
+      fileImage: 'multiple',
+      fileType: 'multiple',
+      fileProcessingLoader: 'single',
+    });
+    // Ensure we have an empty input refs. We need this for the setValue method to redraw the control when it is set.
+    this.refs.input = [];
+    const superAttach = super.attach(element);
+
+    if (this.refs.fileDrop) {
+      const element = this;
+      this.addEventListener(this.refs.fileDrop, 'dragover', function(event) {
+        this.className = 'fileSelector fileDragOver';
         event.preventDefault();
-        // There is no direct way to trigger a file dialog. To work around this, create an input of type file and trigger
-        // a click event on it.
-        if (typeof this.hiddenFileInputElement.trigger === 'function') {
-          this.hiddenFileInputElement.trigger('click');
+      });
+      this.addEventListener(this.refs.fileDrop, 'dragleave', function(event) {
+        this.className = 'fileSelector';
+        event.preventDefault();
+      });
+      this.addEventListener(this.refs.fileDrop, 'drop', function(event) {
+        this.className = 'fileSelector';
+        event.preventDefault();
+        element.statuses = [];
+        element.upload(event.dataTransfer.files);
+      });
+    }
+
+    if (this.refs.fileBrowse) {
+      this.addEventListener(this.refs.fileBrowse, 'click', (event) => {
+        event.preventDefault();
+        this.statuses = [];
+        this.browseFiles(this.browseOptions)
+          .then((files) => {
+            this.upload(files);
+          });
+      });
+    }
+
+    this.refs.fileLink.forEach((fileLink, index) => {
+      this.addEventListener(fileLink, 'click', (event) => {
+        event.preventDefault();
+        this.getFile(this.dataValue[index]);
+      });
+    });
+
+    this.refs.removeLink.forEach((removeLink, index) => {
+      this.addEventListener(removeLink, 'click', (event) => {
+        const fileInfo = this.dataValue[index];
+
+        this.deleteFile(fileInfo);
+        event.preventDefault();
+        this.splice(index);
+        this.redraw();
+      });
+    });
+
+    this.refs.fileStatusRemove.forEach((fileStatusRemove, index) => {
+      this.addEventListener(fileStatusRemove, 'click', (event) => {
+        event.preventDefault();
+        if (this.abortUpload) {
+          this.abortUpload();
         }
-        else {
-          this.hiddenFileInputElement.click();
-        }
-      },
-      class: 'browse'
-    }, this.text('buscar en mi equipo'));
-    this.addFocusBlurEvents(this.browseLink);
+        this.statuses.splice(index, 1);
+        this.redraw();
+      });
+    });
 
-    return this.browseLink;
-  }
+    if (this.refs.galleryButton && webViewCamera) {
+      this.addEventListener(this.refs.galleryButton, 'click', (event) => {
+        event.preventDefault();
+        webViewCamera.getPicture((success) => {
+          window.resolveLocalFileSystemURL(success, (fileEntry) => {
+              fileEntry.file((file) => {
+                const reader = new FileReader();
+                reader.onloadend = (evt) => {
+                  const blob = new Blob([new Uint8Array(evt.target.result)], { type: file.type });
+                  blob.name = file.name;
+                  this.upload([blob]);
+                };
+                reader.readAsArrayBuffer(file);
+              });
+            }
+          );
+        }, (err) => {
+          console.error(err);
+        }, {
+          sourceType: webViewCamera.PictureSourceType.PHOTOLIBRARY,
+        });
+      });
+    }
 
-  buildUploadStatusList(container) {
-    const list = this.ce('div');
-    this.uploadStatusList = list;
-    container.appendChild(list);
-  }
+    if (this.refs.cameraButton && webViewCamera) {
+      this.addEventListener(this.refs.cameraButton, 'click', (event) => {
+        event.preventDefault();
+        webViewCamera.getPicture((success) => {
+          window.resolveLocalFileSystemURL(success, (fileEntry) => {
+              fileEntry.file((file) => {
+                const reader = new FileReader();
+                reader.onloadend = (evt) => {
+                  const blob = new Blob([new Uint8Array(evt.target.result)], { type: file.type });
+                  blob.name = file.name;
+                  this.upload([blob]);
+                };
+                reader.readAsArrayBuffer(file);
+              });
+            }
+          );
+        }, (err) => {
+          console.error(err);
+        }, {
+          sourceType: webViewCamera.PictureSourceType.CAMERA,
+          encodingType: webViewCamera.EncodingType.PNG,
+          mediaType: webViewCamera.MediaType.PICTURE,
+          saveToPhotoAlbum: true,
+          correctOrientation: false,
+        });
+      });
+    }
 
-  addWarnings(container) {
-    let hasWarnings = false;
-    const warnings = this.ce('div', { class: 'alert alert-warning' });
-    if (!this.component.storage) {
-      hasWarnings = true;
-      warnings.appendChild(this.ce('p').appendChild(this.text(
-        'Ningún tipo de almacenamiento ha sido configurado para este campo. Carga de archivos estará deshabilitada hasta que se configure un tipo de almacenamiento.')));
+    if (this.refs.takePictureButton) {
+      this.addEventListener(this.refs.takePictureButton, 'click', (event) => {
+        event.preventDefault();
+        this.takePicture();
+      });
     }
-    if (!this.support.dnd) {
-      hasWarnings = true;
-      warnings.appendChild(this.ce('p').appendChild(this.text('Este navegador no soporta Carga/Descarga de archivos.')));
+
+    if (this.refs.toggleCameraMode) {
+      this.addEventListener(this.refs.toggleCameraMode, 'click', (event) => {
+        event.preventDefault();
+        this.cameraMode = !this.cameraMode;
+        this.redraw();
+      });
     }
-    if (!this.support.filereader) {
-      hasWarnings = true;
-      warnings.appendChild(this.ce('p').appendChild(this.text('File API & FileReader API not supported.')));
+
+    this.refs.fileType.forEach((fileType, index) => {
+      this.dataValue[index].fileType = this.dataValue[index].fileType || this.component.fileTypes[0].label;
+
+      this.addEventListener(fileType, 'change', (event) => {
+        event.preventDefault();
+
+        const fileType = this.component.fileTypes.find((typeObj) => typeObj.value === event.target.value);
+
+        this.dataValue[index].fileType = fileType.label;
+      });
+    });
+
+    const fileService = this.fileService;
+    if (fileService) {
+      const loadingImages = [];
+      this.refs.fileImage.forEach((image, index) => {
+        loadingImages.push(this.loadImage(this.dataValue[index]).then((url) => (image.src = url)));
+      });
+      if (loadingImages.length) {
+        NativePromise.all(loadingImages).then(() => {
+          this.filesReadyResolve();
+        }).catch(() => this.filesReadyReject());
+      }
+      else {
+        this.filesReadyResolve();
+      }
     }
-    if (!this.support.formdata) {
-      hasWarnings = true;
-      warnings.appendChild(this.ce('p').appendChild(this.text('XHR2\'s FormData is not supported.')));
-    }
-    if (!this.support.progress) {
-      hasWarnings = true;
-      warnings.appendChild(this.ce('p').appendChild(this.text('XHR2\'s upload progress isn\'t supported.')));
-    }
-    if (hasWarnings) {
-      container.appendChild(warnings);
-    }
+    return superAttach;
   }
 
   /* eslint-disable max-len */
@@ -564,43 +503,10 @@ export default class FileComponent extends BaseComponent {
 
   /* eslint-enable max-len */
 
-  createUploadStatus(fileUpload) {
-    let container;
-    return container = this.ce('div', { class: `file${fileUpload.status === 'error' ? ' has-error' : ''}` }, [
-      this.ce('div', { class: 'row' }, [
-        this.ce('div', { class: 'fileName control-label col-sm-10' }, [
-          fileUpload.originalName,
-          this.ce('i', {
-            class: this.iconClass('remove'),
-            onClick: () => this.removeChildFrom(container, this.uploadStatusList)
-          })
-        ]),
-        this.ce('div', { class: 'fileSize control-label col-sm-2 text-right' }, this.fileSize(fileUpload.size))
-      ]),
-      this.ce('div', { class: 'row' }, [
-        this.ce('div', { class: 'col-sm-12' }, [
-          (fileUpload.status === 'progress' ?
-              this.ce('div', { class: 'progress' },
-                this.ce('div', {
-                    class: 'progress-bar',
-                    role: 'progressbar',
-                    'aria-valuenow': fileUpload.progress,
-                    'aria-valuemin': 0,
-                    'aria-valuemax': 100,
-                    style: `width:${fileUpload.progress}%`
-                  },
-                  this.ce('span', { class: 'sr-only' }, `${fileUpload.progress}% Complete`)
-                )
-              ) :
-              this.ce('div', { class: `bg-${fileUpload.status}` }, fileUpload.message)
-          )
-        ])
-      ])
-    ]);
-  }
-
   /* eslint-disable max-depth */
   globStringToRegex(str) {
+    str = str.replace(/\s/g, '');
+
     let regexp = '', excludes = [];
     if (str.length > 2 && str[0] === '/' && str[str.length - 1] === '/') {
       regexp = str.substring(1, str.length - 1);
@@ -622,11 +528,11 @@ export default class FileComponent extends BaseComponent {
         }
       }
       else {
-        if (str.indexOf('!') === 0) {
+        if (str.startsWith('!')) {
           excludes.push(`^((?!${this.globStringToRegex(str.substring(1)).regexp}).)*$`);
         }
         else {
-          if (str.indexOf('.') === 0) {
+          if (str.startsWith('.')) {
             str = `*${str}`;
           }
           regexp = `^${str.replace(new RegExp('[.\\\\+*?\\[\\^\\]$(){}=!<>|:\\-]', 'g'), '\\$&')}$`;
@@ -634,7 +540,7 @@ export default class FileComponent extends BaseComponent {
         }
       }
     }
-    return { regexp: regexp, excludes: excludes };
+    return { regexp, excludes };
   }
 
   /* eslint-enable max-depth */
@@ -644,22 +550,22 @@ export default class FileComponent extends BaseComponent {
       if (str.search(/kb/i) === str.length - 2) {
         return parseFloat(str.substring(0, str.length - 2) * 1024);
       }
-      else if (str.search(/mb/i) === str.length - 2) {
-        return parseFloat(str.substring(0, str.length - 2) * 1048576);
+      if (str.search(/mb/i) === str.length - 2) {
+        return parseFloat(str.substring(0, str.length - 2) * 1024 * 1024);
       }
-      else if (str.search(/gb/i) === str.length - 2) {
-        return parseFloat(str.substring(0, str.length - 2) * 1073741824);
+      if (str.search(/gb/i) === str.length - 2) {
+        return parseFloat(str.substring(0, str.length - 2) * 1024 * 1024 * 1024);
       }
-      else if (str.search(/b/i) === str.length - 1) {
+      if (str.search(/b/i) === str.length - 1) {
         return parseFloat(str.substring(0, str.length - 1));
       }
-      else if (str.search(/s/i) === str.length - 1) {
+      if (str.search(/s/i) === str.length - 1) {
         return parseFloat(str.substring(0, str.length - 1));
       }
-      else if (str.search(/m/i) === str.length - 1) {
+      if (str.search(/m/i) === str.length - 1) {
         return parseFloat(str.substring(0, str.length - 1) * 60);
       }
-      else if (str.search(/h/i) === str.length - 1) {
+      if (str.search(/h/i) === str.length - 1) {
         return parseFloat(str.substring(0, str.length - 1) * 3600);
       }
     }
@@ -674,15 +580,14 @@ export default class FileComponent extends BaseComponent {
     let valid = true;
     if (pattern.regexp && pattern.regexp.length) {
       const regexp = new RegExp(pattern.regexp, 'i');
-      valid = (file.type != null && regexp.test(file.type)) ||
-        (file.name != null && regexp.test(file.name));
+      valid = (!_.isNil(file.type) && regexp.test(file.type)) ||
+        (!_.isNil(file.name) && regexp.test(file.name));
     }
-    let len = pattern.excludes.length;
-    while (len--) {
-      const exclude = new RegExp(pattern.excludes[len], 'i');
-      valid = valid && (file.type == null || exclude.test(file.type)) &&
-        (file.name == null || exclude.test(file.name));
-    }
+    valid = pattern.excludes.reduce((result, excludePattern) => {
+      const exclude = new RegExp(excludePattern, 'i');
+      return result && (_.isNil(file.type) || !exclude.test(file.type)) &&
+        (_.isNil(file.name) || !exclude.test(file.name));
+    }, valid);
     return valid;
   }
 
@@ -700,94 +605,190 @@ export default class FileComponent extends BaseComponent {
       files = Array.prototype.slice.call(files, 0, 1);
     }
     if (this.component.storage && files && files.length) {
+      this.fileDropHidden = true;
+
       // files is not really an array and does not have a forEach method, so fake it.
-      Array.prototype.forEach.call(files, file => {
-        const fileName = uniqueName(file.name);
+      /* eslint-disable max-statements */
+      Array.prototype.forEach.call(files, async(file) => {
+        const fileName = uniqueName(file.name, this.component.fileNameTemplate, this.evalContext());
         const fileUpload = {
           originalName: file.name,
           name: fileName,
           size: file.size,
           status: 'info',
-          message: 'Empezando subida'
+          message: this.t(' Procesando archivo. Por favor espere...'),
         };
+
+        // Check if file with the same name is being uploaded
+        const fileWithSameNameUploaded = this.dataValue.some(fileStatus => fileStatus.originalName === file.name);
+        const fileWithSameNameUploadedWithError = this.statuses.findIndex(fileStatus =>
+          fileStatus.originalName === file.name
+          && fileStatus.status === 'error'
+        );
+
+        if (fileWithSameNameUploaded) {
+          fileUpload.status = 'error';
+          fileUpload.message = this.t('Ya existe un archivo subido con el mismo nombre');
+        }
+
+        if (fileWithSameNameUploadedWithError !== -1) {
+          this.statuses.splice(fileWithSameNameUploadedWithError, 1);
+          this.redraw();
+        }
 
         // Check file pattern
         if (this.component.filePattern && !this.validatePattern(file, this.component.filePattern)) {
           fileUpload.status = 'error';
-          fileUpload.message = `File is the wrong type; it must be ${this.component.filePattern}`;
+          fileUpload.message = this.t('El tipo de archivo es incorrecto; este debe ser {{ pattern }}', {
+            pattern: this.component.filePattern,
+          });
         }
 
         // Check file minimum size
         if (this.component.fileMinSize && !this.validateMinSize(file, this.component.fileMinSize)) {
           fileUpload.status = 'error';
-          fileUpload.message = `File is too small; it must be at least ${this.component.fileMinSize}`;
+          fileUpload.message = this.t('El archivo muy pequeño; debe tener al menos {{ size }}', {
+            size: this.component.fileMinSize,
+          });
         }
 
         // Check file maximum size
         if (this.component.fileMaxSize && !this.validateMaxSize(file, this.component.fileMaxSize)) {
           fileUpload.status = 'error';
-          fileUpload.message = `File is too big; it must be at most ${this.component.fileMaxSize}`;
+          fileUpload.message = this.t('El archivo es muy pesado; debe ser máximo de {{ size }}', {
+            size: this.component.fileMaxSize,
+          });
         }
 
         // Get a unique name for this file to keep file collisions from occurring.
         const dir = this.interpolate(this.component.dir || '');
-        const fileService = this.fileService;
+        const { fileService } = this;
         if (!fileService) {
           fileUpload.status = 'error';
-          fileUpload.message = 'File Service not provided.';
+          fileUpload.message = this.t('Servicio de archivos no disponible.');
         }
 
-        let uploadStatus = this.createUploadStatus(fileUpload);
-        this.uploadStatusList.appendChild(uploadStatus);
+        this.statuses.push(fileUpload);
+        this.redraw();
 
         if (fileUpload.status !== 'error') {
           if (this.component.privateDownload) {
             file.private = true;
           }
-          fileService.uploadFile(this.component.storage, file, fileName, dir, evt => {
-            fileUpload.status = 'progress';
-            fileUpload.progress = parseInt(100.0 * evt.loaded / evt.total);
-            delete fileUpload.message;
-            const originalStatus = uploadStatus;
-            uploadStatus = this.createUploadStatus(fileUpload);
-            this.uploadStatusList.replaceChild(uploadStatus, originalStatus);
-          }, this.component.url)
-            .then(fileInfo => {
-              this.removeChildFrom(uploadStatus, this.uploadStatusList);
-              // Default to first type.
-              if (this.hasTypes) {
-                fileInfo.fileType = this.component.fileTypes[0].value;
+          const { storage, options = {} } = this.component;
+          const url = this.interpolate(this.component.url, { file: fileUpload });
+          let groupKey = null;
+          let groupPermissions = null;
+
+          //Iterate through form components to find group resource if one exists
+          this.root.everyComponent((element) => {
+            if (element.component?.submissionAccess || element.component?.defaultPermission) {
+              groupPermissions = !element.component.submissionAccess ? [
+                {
+                  type: element.component.defaultPermission,
+                  roles: [],
+                },
+              ] : element.component.submissionAccess;
+
+              groupPermissions.forEach((permission) => {
+                groupKey = ['admin', 'write', 'create'].includes(permission.type) ? element.component.key : null;
+              });
+            }
+          });
+
+          const fileKey = this.component.fileKey || 'file';
+          const groupResourceId = groupKey ? this.currentForm.submission.data[groupKey]._id : null;
+          let processedFile = null;
+
+          if (this.root.options.fileProcessor) {
+            try {
+              if (this.refs.fileProcessingLoader) {
+                this.refs.fileProcessingLoader.style.display = 'block';
+              }
+              const fileProcessorHandler = fileProcessor(this.fileService, this.root.options.fileProcessor);
+              processedFile = await fileProcessorHandler(file, this.component.properties);
+            }
+            catch (err) {
+              fileUpload.status = 'error';
+              fileUpload.message = this.t('El procesamiento del archivo ha fallado.');
+              this.fileDropHidden = false;
+              this.redraw();
+              return;
+            }
+            finally {
+              if (this.refs.fileProcessingLoader) {
+                this.refs.fileProcessingLoader.style.display = 'none';
+              }
+            }
+          }
+
+          fileUpload.message = this.t('Iniciando la carga del archivo.');
+          this.redraw();
+
+          const filePromise = fileService.uploadFile(
+            storage,
+            processedFile || file,
+            fileName,
+            dir,
+            // Progress callback
+            (evt) => {
+              fileUpload.status = 'progress';
+              fileUpload.progress = parseInt(100.0 * evt.loaded / evt.total);
+              delete fileUpload.message;
+              this.redraw();
+            },
+            url,
+            options,
+            fileKey,
+            groupPermissions,
+            groupResourceId,
+            // Upload start callback
+            () => {
+              this.emit('fileUploadingStart', filePromise);
+            },
+            // Abort upload callback
+            (abort) => this.abortUpload = abort,
+          ).then((fileInfo) => {
+              const index = this.statuses.indexOf(fileUpload);
+              if (index !== -1) {
+                this.statuses.splice(index, 1);
               }
               fileInfo.originalName = file.name;
+              if (!this.hasValue()) {
+                this.dataValue = [];
+              }
               this.dataValue.push(fileInfo);
-              this.refreshDOM();
+              this.fileDropHidden = false;
+              this.redraw();
               this.triggerChange();
+              this.emit('fileUploadingEnd', filePromise);
             })
-            .catch(response => {
+            .catch((response) => {
               fileUpload.status = 'error';
               fileUpload.message = response;
               delete fileUpload.progress;
-              const originalStatus = uploadStatus;
-              uploadStatus = this.createUploadStatus(fileUpload);
-              this.uploadStatusList.replaceChild(uploadStatus, originalStatus);
+              this.fileDropHidden = false;
+              this.redraw();
+              this.emit('fileUploadingEnd', filePromise);
             });
         }
       });
     }
   }
 
-  getFile(fileInfo, event) {
-    const fileService = this.fileService;
+  getFile(fileInfo) {
+    const { options = {} } = this.component;
+    const { fileService } = this;
     if (!fileService) {
-      return alert('File Service not provided');
+      return alert('Servicio de archivo no disponible');
     }
     if (this.component.privateDownload) {
       fileInfo.private = true;
     }
-    fileService.downloadFile(fileInfo).then((file) => {
+    fileService.downloadFile(fileInfo, options).then((file) => {
       if (file) {
-        if (file.storage === 'base64') {
-          download(file.url, file.originalName, file.type);
+        if (['base64', 'indexeddb'].includes(file.storage)) {
+          download(file.url, file.originalName || file.name, file.type);
         }
         else {
           window.open(file.url, '_blank');
@@ -799,10 +800,20 @@ export default class FileComponent extends BaseComponent {
         // User is expecting an immediate notification due to attempting to download a file.
         alert(response);
       });
-    event.preventDefault();
   }
 
   focus() {
-    this.browseLink.focus();
+    if ('beforeFocus' in this.parent) {
+      this.parent.beforeFocus(this);
+    }
+
+    if (this.refs.fileBrowse) {
+      this.refs.fileBrowse.focus();
+    }
+  }
+
+  destroy() {
+    this.stopVideo();
+    super.destroy();
   }
 }

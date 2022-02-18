@@ -1,7 +1,14 @@
 module.exports = function(config) {
+  const { KARMA_FILE = 'src/**/*.spec.js' } = process.env;
+  const FILE = KARMA_FILE || 'src/**/*.spec.js';
   config.set({
     basePath: '',
     frameworks: ['mocha'],
+    client: {
+      mocha: {
+        timeout: 5000
+      }
+    },
     webpack: {
       mode: 'development',
       module: {
@@ -11,11 +18,25 @@ module.exports = function(config) {
             exclude: /node_modules/,
             use: {
               loader: 'babel-loader',
-              options: {
-                presets: ['@babel/env'],
-                plugins: ['@babel/plugin-proposal-export-default-from']
-              }
+              options: require('./babel.config.js')
             }
+          },
+          {
+            test: /\.html$/,
+            use: {
+              loader: 'raw-loader'
+            }
+          },
+          {
+            test: /\.ejs$/,
+            use: [{
+              loader: 'ejs-loader',
+              options: {
+                evaluate: /\{%([\s\S]+?)%\}/g,
+                interpolate: /\{\{([\s\S]+?)\}\}/g,
+                escape: /\{\{\{([\s\S]+?)\}\}\}/g
+              }
+            }]
           }
         ]
       }
@@ -38,12 +59,12 @@ module.exports = function(config) {
         served: true,
         nocache: false
       },
-      'src/**/*.spec.js'
+      FILE
     ],
     exclude: [
     ],
     preprocessors: {
-      'src/**/*.spec.js': ['webpack']
+      [FILE]: ['webpack']
     },
     browserNoActivityTimeout: 30000,
     reporters: ['mocha'],
@@ -54,5 +75,5 @@ module.exports = function(config) {
     browsers: ['Chrome'],
     singleRun: false,
     concurrency: Infinity
-  })
-}
+  });
+};

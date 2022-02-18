@@ -1,44 +1,106 @@
 import i18next from 'i18next';
 import assert from 'power-assert';
 import _ from 'lodash';
-import EventEmitter from 'eventemitter2';
-
-import i18Defaults from '../src/i18n';
-import WebformBuilder from '../src/WebformBuilder';
-import AllComponents from '../src/components';
-import Components from '../src/components/Components';
+import EventEmitter from 'eventemitter3';
+import { expect } from 'chai';
+import i18Defaults from '../lib/i18n';
+import FormBuilder from '../lib/FormBuilder';
+import AllComponents from '../lib/components';
+import Components from '../lib/components/Components';
 
 Components.setComponents(AllComponents);
 
+if (process) {
+  // Do not handle unhandled rejections.
+  process.on('unhandledRejection', () => {
+    console.warn('Unhandled rejection!');
+  });
+}
+
+// Make sure that the Option is available from the window.
+global.Option = global.window.Option;
+
 let formBuilderElement = null;
 let formBuilder = null;
+
+function onNext(cmp, event, cb) {
+  expect(cmp.events).to.be.an('object');
+  expect(cmp.events.once).to.be.a('function');
+  const fullEvent = `${cmp.options.namespace}.${event}`;
+  cmp.events.once(fullEvent, cb);
+}
+
 const Harness = {
-  builderBefore(done) {
+  builderBefore(done, options = {}) {
+    var html;    // Unsure what _your code_ needs here -- using `undefined` to trigger default value
+    var opt = { url: 'http://localhost/' };
+    this.jsdom = require('jsdom-global')(html, opt);
+    window.confirm = () => true;
     formBuilderElement = document.createElement('div');
     document.body.appendChild(formBuilderElement);
-    formBuilder = new WebformBuilder(formBuilderElement);
-    formBuilder.form = {components: []};
-    formBuilder.builderReady.then(done);
+    formBuilder = new FormBuilder(formBuilderElement, { display: 'form', components: [] }, options);
+    formBuilder.instance.ready.then(() => done());
   },
 
-  builderAfter() {
-    formBuilder.destroy();
+  builderAfter(done) {
+    formBuilder.instance.destroy();
     document.body.removeChild(formBuilderElement);
+    done();
   },
 
-  buildComponent(type) {
+  getBuilder() {
+    return formBuilder.instance;
+  },
+
+  saveComponent() {
+    const click = new MouseEvent('click', {
+      view: window,
+      bubbles: true,
+      cancelable: true
+    });
+
+    const saveBtn = formBuilder.instance.componentEdit.querySelector('[ref="saveButton"]');
+    if (saveBtn) {
+      saveBtn.dispatchEvent(click);
+    }
+  },
+
+  buildComponent(type, container) {
     // Get the builder sidebar component.
+    const webformBuilder = formBuilder.instance;
     let builderGroup = null;
-    _.each(formBuilder.groups, (group) => {
+    let groupName = '';
+
+    _.each(webformBuilder.groups, (group, key) => {
       if (group.components[type]) {
-        builderGroup = group.body;
+        groupName = key;
         return false;
       }
     });
-    const component = document.getElementById(`builder-${type}`).cloneNode(true);
-    formBuilder.element.appendChild(component);
-    formBuilder.onDrop(component, formBuilder.element, builderGroup);
-    return formBuilder;
+
+    if (!groupName) {
+      return;
+    }
+    const openedGroup = document.getElementById(`group-${groupName}"`);
+    if (openedGroup) {
+      openedGroup.classList.remove('in');
+    }
+    const group = document.getElementById(`group-${groupName}`);
+    group && group.classList.add('in');
+
+    let component = webformBuilder.element.querySelector(`span[data-type='${type}']`);
+    if (component) {
+      component = component && component.cloneNode(true);
+      const element = container || webformBuilder.element.querySelector('.drag-container.formio-builder-form');
+      element.appendChild(component);
+      builderGroup = document.getElementById(`group-container-${groupName}`);
+      webformBuilder.onDrop(component, element, builderGroup);
+    }
+    else {
+      return;
+    }
+
+    return webformBuilder;
   },
 
   setComponentProperty(property, before, after, cb) {
@@ -73,17 +135,19 @@ const Harness = {
   testCreate(Component, componentSettings, options = {}) {
     const compSettings = _.cloneDeep(componentSettings);
     const component = new Component(compSettings, _.merge({
-      events: new EventEmitter({
-        wildcard: false,
-        maxListeners: 0
-      })
+      events: new EventEmitter(),
     }, options));
+    component.pristine = false;
     return new Promise((resolve, reject) => {
       i18next.init(i18Defaults, (err) => {
         if (err) {
           return reject(err);
         }
-        component.build();
+        // Need a parent element to redraw.
+        const parent = document.createElement('div');
+        const element = document.createElement('div');
+        parent.appendChild(element);
+        component.build(element);
         assert(Boolean(component.element), `No ${component.type} element created.`);
         return resolve(component);
       });
@@ -94,13 +158,13 @@ const Harness = {
       form.everyComponent((comp) => {
         if (hidden.includes(comp.component.key)) {
           // Should be hidden.
-          assert(comp.element.hidden, 'Element should not be visible');
-          assert.equal(comp.element.style.visibility, 'hidden');
+          assert(!comp.visible, 'Element should not be visible');
+          assert.equal(comp.element.childElementCount, 0, 'Hidden elements should not have children');
         }
         else {
           // Should be visible.
-          assert(!comp.element.hidden, 'Element should not be hidden');
-          assert((comp.element.style.visibility === '') || (comp.element.style.visibility === 'visible'), 'Element must be visible');
+          assert(comp.visible, 'Element should not be hidden');
+          assert.notEqual(comp.element.childElementCount, 0, 'Element must be visible');
         }
       });
       done();
@@ -117,14 +181,36 @@ const Harness = {
       assert(element.style.visibility === 'hidden', 'Element must be hidden');
     }
   },
+  testComponentVisibility(component, query, visible) {
+    const element = component.element.querySelector(query);
+    assert(element, `${query} not found`);
+    const isHidden = element.className.includes('formio-hidden');
+    if (visible) {
+      assert(!isHidden, 'Element must be visible');
+    }
+    else {
+      assert(isHidden, 'Element must be hidden');
+    }
+  },
   clickElement(component, query) {
     const clickEvent = new MouseEvent('click', {
       view: window,
       bubbles: true,
       cancelable: true
     });
-    const element = this.testElement(component, query, true);
-    return element.dispatchEvent(clickEvent);
+    let element = query;
+    if (typeof query === 'string') {
+      element = this.testElement(component, query, true);
+    }
+    return element ? element.dispatchEvent(clickEvent) : null;
+  },
+  dispatchEvent(eventType, element, query, beforeDispatch) {
+    const event = new Event(eventType, { bubbles: true, cancelable: true });
+    const el = query instanceof HTMLElement ? query : element.querySelector(query);
+    assert(el, 'Element is not found');
+    beforeDispatch && beforeDispatch(el);
+    el.dispatchEvent(event);
+    return el;
   },
   testElements(component, query, number) {
     const elements = component.element.querySelectorAll(query);
@@ -155,6 +241,20 @@ const Harness = {
     assert(element, `${query} not found`);
     assert(element.className.split(' ').includes(className));
   },
+  testModalWrapperErrorClasses(component, shouldBeInvalid = true, query = '[ref="openModalWrapper"]') {
+    const modalWrapper = component.element.querySelector(query);
+    assert(modalWrapper, `${query} not found`);
+    assert.equal(
+      modalWrapper.className.split(' ').includes('formio-error-wrapper'),
+      shouldBeInvalid,
+      `Should ${shouldBeInvalid ? '' : 'not'} have error class`
+    );
+    assert.equal(
+      modalWrapper.className.split(' ').includes('has-message'),
+      shouldBeInvalid,
+      `Should ${shouldBeInvalid ? '' : 'not'} have class indicating that the component has a message`
+    );
+  },
   testElementAttribute(element, attribute, expected) {
     if (element !== undefined && element.getAttribute(attribute)) {
       assert.equal(expected, element.getAttribute(attribute));
@@ -168,21 +268,32 @@ const Harness = {
     return component;
   },
   setInputValue(component, name, value) {
-    const inputEvent = new Event('input', {bubbles: true, cancelable: true});
+    const inputEvent = new Event('input', { bubbles: true, cancelable: true });
     const element = component.element.querySelector(`input[name="${name}"]`);
     assert(element, `${name} input not found`);
     element.value = value;
     return element.dispatchEvent(inputEvent);
   },
-  getInputValue(component, name, value) {
+  getInputValue(component, name, value, valueProperty = 'value') {
     const element = component.element.querySelector(`[name="${name}"]`);
     assert(element, `${name} input not found`);
-    assert.equal(value, element.value);
+    assert.equal(value, element[valueProperty]);
+  },
+  setTagsValue(values, component) {
+    const blurEvent = new Event('blur');
+    const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+    const element = component.choices.input.element;
+
+    values.forEach(value => {
+      element.value = value;
+      element.dispatchEvent(inputEvent);
+      element.dispatchEvent(blurEvent);
+    });
   },
   testSetInput(component, input, output, visible, index = 0) {
     component.setValue(input);
     assert.deepEqual(component.getValue(), output);
-    assert.deepEqual(component.inputs[index].value, visible);
+    assert.deepEqual(component.refs.input[index].value, visible);
     return component;
   },
   testSubmission(form, submission, onChange) {
@@ -196,14 +307,64 @@ const Harness = {
     form.on('error', (err) => {
       _.each(errors, (error, index) => {
         error.component = form.getComponent(error.component).component;
-        assert.deepEqual(err[index], error);
+        assert.deepEqual(err[index].component, error.component);
+        assert.equal(err[index].message, error.message);
       });
       form.off('error');
       done();
     });
+
     this.testSetGet(form, submission);
     assert.deepEqual(form.data, submission.data);
-    form.submit();
+    form.submit().catch(() => console.log('Expected error when executing submit in errors test'));
+  },
+  testValid(component, value) {
+    return new Promise((resolve, reject) => {
+      let resolved = false;
+      component.on('componentChange', () => {
+        if (resolved) {
+          return;
+        }
+        const valid = component.checkValidity();
+        if (valid) {
+          assert.equal(component.dataValue, value);
+          resolve();
+        }
+        else {
+          reject('Component should be valid');
+        }
+        resolved = true;
+      });
+      component.setValue(value);
+      component.triggerChange();
+    });
+  },
+  testInvalid(component, value, field, expectedError) {
+    return new Promise((resolve, reject) => {
+      let resolved = false;
+      component.on('componentChange', () => {
+        if (resolved) {
+          return;
+        }
+        if (component.checkValidity()) {
+          reject('Component should not be valid');
+          resolved = true;
+        }
+      });
+      component.on('componentError', (error) => {
+        if (resolved) {
+          return;
+        }
+        assert.equal(error.component.key, field);
+        assert.equal(error.message, expectedError);
+        resolve();
+        resolved = true;
+      });
+
+      // Set the value.
+      component.setValue(value);
+      component.triggerChange();
+    });
   },
   testComponent(component, test, done) {
     let testBad = true;
@@ -225,6 +386,7 @@ const Harness = {
     });
 
     // Set the value.
+    component.pristine = false;
     component.setValue(test.bad.value);
   },
   testWizardPrevPage(form, errors, onPrevPage) {
@@ -256,11 +418,12 @@ const Harness = {
     return form.nextPage();
   },
   testNumberBlur(cmp, inv, outv, display, index = 0) {
-    const input = _.get(cmp, ['inputs', index], {});
+    const input = _.get(cmp, ['refs', 'input', index], {});
     input.value = inv;
     input.dispatchEvent(new Event('blur'));
     assert.strictEqual(cmp.getValueAt(index), outv);
     assert.strictEqual(input.value, display);
-  }
+  },
+  onNext
 };
 export default Harness;
