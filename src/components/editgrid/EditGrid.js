@@ -1335,10 +1335,6 @@ export default class EditGridComponent extends NestedArrayComponent {
       this.buildTable();
     }
   }
-
-  restoreComponentsContext() {
-    return;
-  }
 }
 
 EditGridComponent.prototype.hasChanged = Component.prototype.hasChanged;

@@ -17,6 +17,21 @@ const RemoveValueIconHiddenClass = 'address-autocomplete-remove-value-icon--hidd
 const ChildConditional = 'show = _.get(instance, \'parent.manualMode\', false);';
 
 export default class AddressComponent extends ContainerComponent {
+  constructor(component, options, data) {
+    super(component, options, data);
+    let src = 'https://maps.googleapis.com/maps/api/js?v=3&libraries=places&callback=googleMapsCallback';
+    if (component.map && component.map.key) {
+      src += `&key=${component.map.key}`;
+    }
+    if (component.map && component.map.language) {
+      src += `&language=${component.map.language}`;
+    }
+    if (component.map && component.map.region) {
+      src += `&region=${component.map.region}`;
+    }
+    Formio.requireLibrary('googleMaps', 'google.maps.places', src);
+  }
+
   static schema(...extend) {
     return ContainerComponent.schema({
       type: 'address',
@@ -99,14 +114,8 @@ export default class AddressComponent extends ContainerComponent {
     if (component.components) {
       defaultSchema = _.omit(defaultSchema, 'components');
     }
-    if (component.map && component.map.language) {
-      src += `&language=${component.map.language}`;
-    }
-    if (component.map && component.map.region) {
-      src += `&region=${component.map.region}`;
 
     return _.defaultsDeep(component , defaultSchema);
-    }
   }
 
   init() {

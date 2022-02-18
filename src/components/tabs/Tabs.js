@@ -116,7 +116,7 @@ export default class TabsComponent extends NestedComponent {
    *
    * @param index
    */
-  setTab(index, state) {
+  setTab(index) {
     if (
       !this.tabs ||
       !this.tabs[index] ||

@@ -349,40 +349,6 @@ export default class WebformBuilder extends Component {
   }
   /* eslint-enable max-statements */
 
-  /**
-   * Creates copy of component schema and stores it under sessionStorage.
-   * @param {Component} component
-   * @return {*}
-   */
-  copyComponent(component) {
-    if (!window.sessionStorage) {
-      return console.log('Session storage is not supported in this browser.');
-    }
-    this.addClass(this.element, 'builder-paste-mode');
-    const copy = _.cloneDeep(component.schema);
-    window.sessionStorage.setItem('formio.clipboard', JSON.stringify(copy));
-  }
-
-  /**
-   * Paste copied component after the current component.
-   * @param {Component} component
-   * @return {*}
-   */
-  pasteComponent(component) {
-    if (!window.sessionStorage) {
-      return console.log('Session storage is not supported in this browser.');
-    }
-    this.removeClass(this.element, 'builder-paste-mode');
-    const data = window.sessionStorage.getItem('formio.clipboard');
-    if (data) {
-      const schema = JSON.parse(data);
-      window.sessionStorage.removeItem('formio.clipboard');
-      BuilderUtils.uniquify(this._form, schema);
-      component.parent.addComponent(schema, false, false, component.element.nextSibling);
-      this.form = this.schema;
-    }
-  }
-
   attachTooltip(component, title) {
     return tippy(component, {
       trigger: 'mouseenter focus',

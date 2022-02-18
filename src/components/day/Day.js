@@ -593,13 +593,4 @@ export default class DayComponent extends Field {
   getValidationFormat() {
     return this.dayFirst ? 'DD-MM-YYYY' : 'MM-DD-YYYY';
   }
-
-  isPartialDay(value) {
-    if (!value) {
-      return false;
-    }
-    const [DAY, MONTH, YEAR] = this.component.dayFirst ? [0, 1, 2] : [1, 0, 2];
-    const values = value.split('/');
-    return (values[DAY] === '00' || values[MONTH] === '00' || values[YEAR] === '0000');
-  }
 }

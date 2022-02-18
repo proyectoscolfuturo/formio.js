@@ -1128,15 +1128,6 @@ export default class SelectComponent extends Field {
     }
 
     this.addEventListener(input, 'showDropdown', () => this.update());
-    if (placeholderValue && this.choices.isSelectOneElement) {
-      this.addEventListener(input, 'removeItem', () => {
-        const items = this.choices.store.getItemsFilteredByActive();
-        if (!items.length) {
-          this.choices._addItem(placeholderValue, placeholderValue, 0, -1, null, true, null);
-        }
-      });
-    }
-
     if (this.choices && choicesOptions.placeholderValue && this.choices._isSelectOneElement) {
       this.addPlaceholderItem(choicesOptions.placeholderValue);
 
@@ -1666,16 +1657,6 @@ export default class SelectComponent extends Field {
       noUpdateEvent: true
     });
     this.unset();
-  }
-
-  /**
-   * Deletes the value of the component.
-   */
-  deleteValue() {
-    this.setValue('', {
-      noUpdateEvent: true
-    });
-    _.unset(this.data, this.key);
   }
 
   /**

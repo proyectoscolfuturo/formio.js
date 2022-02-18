@@ -520,13 +520,6 @@ export default class FormComponent extends Component {
     return this.subFormReady && (!this.component.hasOwnProperty('reference') || this.component.reference) && !this.isHidden();
   }
 
-  setPristine(pristine) {
-    super.setPristine(pristine);
-    if (this.subForm) {
-      this.subForm.setPristine(pristine);
-    }
-  }
-
   /**
    * Returns the data for the subform.
    *

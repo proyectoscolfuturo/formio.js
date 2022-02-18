@@ -24,8 +24,4 @@ export default class UnknownComponent extends Component {
   get defaultSchema() {
     return UnknownComponent.schema();
   }
-
-  get defaultSchema() {
-    return UnknownComponent.schema();
-  }
 }

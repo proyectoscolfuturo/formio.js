@@ -1,5 +1,3 @@
-import Flatpickr from 'flatpickr';
-import { Spanish } from 'flatpickr/dist/l10n/es';
 import { GlobalFormio as Formio } from '../Formio';
 import InputWidget from './InputWidget';
 import {

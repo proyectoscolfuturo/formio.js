@@ -46,14 +46,6 @@ export default class TableComponent extends NestedComponent {
     };
   }
 
-  constructor(component, options, data) {
-    const originalRows = _.cloneDeep(component.rows);
-    super(component, options, data);
-    if (!_.isEqual(originalRows, this.component.rows)) {
-      this.component.rows = originalRows;
-    }
-  }
-
   get defaultSchema() {
     return TableComponent.schema();
   }

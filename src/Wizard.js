@@ -1053,31 +1053,6 @@ export default class Wizard extends Webform {
   checkCurrentPageValidity(...args) {
     return super.checkValidity(...args);
   }
-
-  checkPagesValidity(pages, ...args) {
-    const isValid = Base.prototype.checkValidity.apply(this, args);
-    return pages.reduce((check, pageComp) => {
-      return pageComp.checkValidity(...args) && check;
-    }, isValid);
-  }
-
-  checkValidity(data, dirty) {
-    return this.checkPagesValidity(this.getPages(), data, dirty);
-  }
-
-  get errors() {
-    if (this.isLastPage()) {
-      const pages = this.getPages({ all: true });
-
-      this.checkPagesValidity(pages, this.submission.data, true);
-
-      return pages.reduce((errors, pageComp) => {
-        return errors.concat(pageComp.errors || []);
-      }, []);
-    }
-
-    return super.errors;
-  }
 }
 
 Wizard.setBaseUrl = Formio.setBaseUrl;

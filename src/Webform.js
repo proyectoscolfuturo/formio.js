@@ -1258,13 +1258,6 @@ export default class Webform extends NestedDataComponent {
           displayedErrors.push(createListItem(message));
         }
       }
-
-      components.forEach((path) => {
-        const component = this.getComponent(path, _.identity, err);
-        const components = _.compact(Array.isArray(component) ? component : [component]);
-
-        components.forEach((component) => component.setCustomValidity(err.message, true));
-      });
     });
 
     const errorsList = this.renderTemplate('errorsList', { errors: displayedErrors });

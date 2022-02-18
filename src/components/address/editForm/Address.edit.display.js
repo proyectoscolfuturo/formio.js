@@ -1,7 +1,7 @@
 export default [
   {
-    type: 'container', 
-    key: 'map', 
+    type: 'container',
+    key: 'map',
     input: true,
     weight: 610,
     components: [
@@ -366,7 +366,6 @@ export default [
     weight: 20,
     type: 'checkbox',
     input: true,
-    weight: 610,
     key: 'enableManualMode',
     label: 'Enable Manual Mode',
     tooltip: 'Should Manual Mode be enabled for that component or not.',
