@@ -15,6 +15,9 @@ export default [
     label: 'Width',
     tooltip: 'The width of the signature area.',
     placeholder: 'Width',
+    conditional: {
+      json: { '!' : [{ var: 'data.keepOverlayRatio' }] },
+    },
     weight: 50
   },
   {
@@ -23,8 +26,19 @@ export default [
     key: 'height',
     label: 'Height',
     tooltip: 'The height of the signature area.',
-    placeholder: 'Height',
+    placeholder: 'Height',    conditional: {
+      json: { '!' : [{ var: 'data.keepOverlayRatio' }] },
+    },
     weight: 51
+  },
+  {
+    weight: 52,
+    type: 'checkbox',
+    label: 'Keep Overlay Aspect Ratio',
+    tooltip: 'If checked, the field will have the same aspect ratio as its preview.',
+    key: 'keepOverlayRatio',
+    customConditional: ({ options }) => (options?.editForm?.display === 'pdf'),
+    input: true
   },
   {
     type: 'textfield',
@@ -43,5 +57,13 @@ export default [
     tooltip: 'The ink color for the signature area.',
     placeholder: 'Pen Color',
     weight: 53
-  }
+  },
+  {
+    key: 'placeholder',
+    ignore: true,
+  },
+  {
+    key: 'autofocus',
+    ignore: true,
+  },
 ];

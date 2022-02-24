@@ -17,15 +17,15 @@ export default class EmailComponent extends TextFieldComponent {
     return {
       title: 'Email',
       group: 'advanced',
-      icon: 'fa fa-at',
-      documentation: 'http://help.form.io/userguide/#email',
+      icon: 'at',
+      documentation: '/userguide/#email',
       weight: 10,
       schema: EmailComponent.schema()
     };
   }
 
-  constructor(component, options, data) {
-    super(component, options, data);
+  init() {
+    super.init();
     this.validators.push('email');
   }
 
@@ -33,9 +33,22 @@ export default class EmailComponent extends TextFieldComponent {
     return EmailComponent.schema();
   }
 
-  elementInfo() {
-    const info = super.elementInfo();
+  get inputInfo() {
+    const info = super.inputInfo;
     info.attr.type = this.component.mask ? 'password' : 'email';
     return info;
+  }
+
+  normalizeValue(value, flags = {}) {
+    value = super.normalizeValue(value, flags);
+    if (this.options.server && !!value) {
+      if (Array.isArray(value)) {
+        value = value.map(val => val.toLowerCase());
+      }
+      else {
+        value = value.toLowerCase();
+      }
+    }
+    return value;
   }
 }

@@ -1,4 +1,5 @@
 import get from 'lodash/get';
+import set from 'lodash/set';
 import has from 'lodash/has';
 import clone from 'lodash/clone';
 import forOwn from 'lodash/forOwn';
@@ -9,6 +10,8 @@ import isPlainObject from 'lodash/isPlainObject';
 import round from 'lodash/round';
 import chunk from 'lodash/chunk';
 import pad from 'lodash/pad';
+import { compare, applyPatch } from 'fast-json-patch';
+import _ from 'lodash';
 
 /**
  * Determine if a component is a layout component or not.
@@ -41,9 +44,16 @@ export function isLayoutComponent(component) {
  * @param {Object} parent
  *   The parent object.
  */
-export function eachComponent(components, fn, includeAll, path, parent) {
+export function eachComponent(components, fn, includeAll, path, parent, inRecursion) {
   if (!components) return;
   path = path || '';
+  if (inRecursion) {
+    if (components.noRecurse) {
+      delete components.noRecurse;
+      return;
+    }
+    components.noRecurse = true;
+  }
   components.forEach((component) => {
     if (!component) {
       return;
@@ -64,8 +74,11 @@ export function eachComponent(components, fn, includeAll, path, parent) {
       delete component.parent.rows;
     }
 
-    if (includeAll || component.tree || (!hasColumns && !hasRows && !hasComps)) {
-      noRecurse = fn(component, newPath);
+    // there's no need to add other layout components here because we expect that those would either have columns, rows or components
+    const layoutTypes = ['htmlelement', 'content'];
+    const isLayoutComponent = hasColumns || hasRows || (hasComps && !component.input) || layoutTypes.indexOf(component.type) > -1;
+    if (includeAll || component.tree || !isLayoutComponent) {
+      noRecurse = fn(component, newPath, components);
     }
 
     const subPath = () => {
@@ -73,7 +86,7 @@ export function eachComponent(components, fn, includeAll, path, parent) {
         component.key &&
         !['panel', 'table', 'well', 'columns', 'fieldset', 'tabs', 'form'].includes(component.type) &&
         (
-          ['datagrid', 'container', 'editgrid'].includes(component.type) ||
+          ['datagrid', 'container', 'editgrid', 'address', 'dynamicWizard', 'datatable'].includes(component.type) ||
           component.tree
         )
       ) {
@@ -91,23 +104,26 @@ export function eachComponent(components, fn, includeAll, path, parent) {
     if (!noRecurse) {
       if (hasColumns) {
         component.columns.forEach((column) =>
-          eachComponent(column.components, fn, includeAll, subPath(), parent ? component : null));
+          eachComponent(column.components, fn, includeAll, subPath(), parent ? component : null), true);
       }
 
       else if (hasRows) {
         component.rows.forEach((row) => {
           if (Array.isArray(row)) {
             row.forEach((column) =>
-              eachComponent(column.components, fn, includeAll, subPath(), parent ? component : null));
+              eachComponent(column.components, fn, includeAll, subPath(), parent ? component : null), true);
           }
         });
       }
 
       else if (hasComps) {
-        eachComponent(component.components, fn, includeAll, subPath(), parent ? component : null);
+        eachComponent(component.components, fn, includeAll, subPath(), parent ? component : null, true);
       }
     }
   });
+  if (components.noRecurse) {
+    delete components.noRecurse;
+  }
 }
 
 /**
@@ -119,7 +135,7 @@ export function eachComponent(components, fn, includeAll, path, parent) {
  */
 export function matchComponent(component, query) {
   if (isString(query)) {
-    return component.key === query;
+    return (component.key === query) || (component.path === query);
   }
   else {
     let matches = false;
@@ -147,8 +163,7 @@ export function matchComponent(component, query) {
 export function getComponent(components, key, includeAll) {
   let result;
   eachComponent(components, (component, path) => {
-    if (path === key) {
-      component.path = path;
+    if ((path === key) || (component.path === key)) {
       result = component;
       return true;
     }
@@ -163,15 +178,207 @@ export function getComponent(components, key, includeAll) {
  * @param query
  * @return {*}
  */
-export function findComponents(components, query) {
+export function searchComponents(components, query) {
   const results = [];
-  eachComponent(components, (component, path) => {
+  eachComponent(components, (component) => {
     if (matchComponent(component, query)) {
-      component.path = path;
       results.push(component);
     }
   }, true);
   return results;
+}
+
+/**
+ * Deprecated version of findComponents. Renamed to searchComponents.
+ *
+ * @param components
+ * @param query
+ * @returns {*}
+ */
+export function findComponents(components, query) {
+  console.warn('formio.js/utils findComponents is deprecated. Use searchComponents instead.');
+  return searchComponents(components, query);
+}
+
+/**
+ * This function will find a component in a form and return the component AND THE PATH to the component in the form.
+ * Path to the component is stored as an array of nested components and their indexes.The Path is being filled recursively
+ * when you iterating through the nested structure.
+ * If the component is not found the callback won't be called and function won't return anything.
+ *
+ * @param components
+ * @param key
+ * @param fn
+ * @param path
+ * @returns {*}
+ */
+export function findComponent(components, key, path, fn) {
+  if (!components) return;
+  path = path || [];
+
+  if (!key) {
+    return fn(components);
+  }
+
+  components.forEach(function(component, index) {
+    var newPath = path.slice();
+    // Add an index of the component it iterates through in nested structure
+    newPath.push(index);
+    if (!component) return;
+
+    if (component.hasOwnProperty('columns') && Array.isArray(component.columns)) {
+      newPath.push('columns');
+      component.columns.forEach(function(column, index) {
+        var colPath = newPath.slice();
+        colPath.push(index);
+        colPath.push('components');
+        findComponent(column.components, key, colPath, fn);
+      });
+    }
+
+    if (component.hasOwnProperty('rows') && Array.isArray(component.rows)) {
+      newPath.push('rows');
+      component.rows.forEach(function(row, index) {
+        var rowPath = newPath.slice();
+        rowPath.push(index);
+        row.forEach(function(column, index) {
+          var colPath = rowPath.slice();
+          colPath.push(index);
+          colPath.push('components');
+          findComponent(column.components, key, colPath, fn);
+        });
+      });
+    }
+
+    if (component.hasOwnProperty('components') && Array.isArray(component.components)) {
+      newPath.push('components');
+      findComponent(component.components, key, newPath, fn);
+    }
+
+    if (component.key === key) {
+      //Final callback if the component is found
+      fn(component, newPath, components);
+    }
+  });
+}
+
+/**
+ * Remove a component by path.
+ *
+ * @param components
+ * @param path
+ */
+export function removeComponent(components, path) {
+  // Using _.unset() leave a null value. Use Array splice instead.
+  var index = path.pop();
+  if (path.length !== 0) {
+    components = get(components, path);
+  }
+  components.splice(index, 1);
+}
+
+export function generateFormChange(type, data) {
+  let change;
+  switch (type) {
+    case 'add':
+      change = {
+        op: 'add',
+        key: data.component.key,
+        container: data.parent.key, // Parent component
+        path: data.path, // Path to container within parent component.
+        index: data.index, // Index of component in parent container.
+        component: data.component
+      };
+      break;
+    case 'edit':
+      change = {
+        op: 'edit',
+        key: data.originalComponent.key,
+        patches: compare(data.originalComponent, data.component)
+      };
+
+      // Don't save if nothing changed.
+      if (!change.patches.length) {
+        change = null;
+      }
+      break;
+    case 'remove':
+      change = {
+        op: 'remove',
+        key: data.component.key,
+      };
+      break;
+  }
+
+  return change;
+}
+
+export function applyFormChanges(form, changes) {
+  const failed = [];
+  changes.forEach(function(change) {
+    var found = false;
+    switch (change.op) {
+      case 'add':
+        var newComponent = change.component;
+
+        // Find the container to set the component in.
+        findComponent(form.components, change.container, null, function(parent) {
+          if (!change.container) {
+            parent = form;
+          }
+
+          // A move will first run an add so remove any existing components with matching key before inserting.
+          findComponent(form.components, change.key, null, function(component, path) {
+            // If found, use the existing component. (If someone else edited it, the changes would be here)
+            newComponent = component;
+            removeComponent(form.components, path);
+          });
+
+          found = true;
+          var container = get(parent, change.path);
+          container.splice(change.index, 0, newComponent);
+        });
+        break;
+      case 'remove':
+        findComponent(form.components, change.key, null, function(component, path) {
+          found = true;
+          const oldComponent = get(form.components, path);
+          if (oldComponent.key !== component.key) {
+            path.pop();
+          }
+          removeComponent(form.components, path);
+        });
+        break;
+      case 'edit':
+        findComponent(form.components, change.key, null, function(component, path) {
+          found = true;
+          try {
+            const oldComponent = get(form.components, path);
+            const newComponent = applyPatch(component, change.patches).newDocument;
+
+            if (oldComponent.key !== newComponent.key) {
+              path.pop();
+            }
+
+            set(form.components, path, newComponent);
+          }
+          catch (err) {
+            failed.push(change);
+          }
+        });
+        break;
+      case 'move':
+        break;
+    }
+    if (!found) {
+      failed.push(change);
+    }
+  });
+
+  return {
+    form,
+    failed
+  };
 }
 
 /**
@@ -203,8 +410,11 @@ export function flattenComponents(components, includeAll) {
 export function hasCondition(component) {
   return Boolean(
     (component.customConditional) ||
-    (component.conditional && component.conditional.when) ||
-    (component.conditional && component.conditional.json)
+    (component.conditional && (
+      component.conditional.when ||
+      component.conditional.json ||
+      component.conditional.condition
+    ))
   );
 }
 
@@ -276,7 +486,7 @@ export function getValue(submission, key) {
   const search = (data) => {
     if (isPlainObject(data)) {
       if (has(data, key)) {
-        return data[key];
+        return _.get(data, key);
       }
 
       let value = null;
@@ -304,13 +514,14 @@ export function getValue(submission, key) {
  * @param form
  */
 export function getStrings(form) {
-  const properties = ['label', 'title', 'legend', 'tooltip', 'description', 'placeholder', 'prefix', 'suffix', 'errorLabel'];
+  const properties = ['label', 'title', 'legend', 'tooltip', 'description', 'placeholder', 'prefix', 'suffix', 'errorLabel', 'content', 'html'];
   const strings = [];
   eachComponent(form.components, component => {
     properties.forEach(property => {
       if (component.hasOwnProperty(property) && component[property]) {
         strings.push({
           key: component.key,
+          type: component.type,
           property,
           string: component[property]
         });
@@ -381,7 +592,7 @@ export function getStrings(form) {
     }
 
     if (component.type === 'editgrid') {
-      const string = this.component.addAnother || 'Add Another';
+      const string = component.addAnother || 'Add Another';
       if (component.addAnother) {
         strings.push({
           key: component.key,

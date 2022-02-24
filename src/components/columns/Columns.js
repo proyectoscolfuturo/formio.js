@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import NestedComponent from '../nested/NestedComponent';
+import NestedComponent from '../_classes/nested/NestedComponent';
 
 export default class ColumnsComponent extends NestedComponent {
   static schema(...extend) {
@@ -8,44 +8,26 @@ export default class ColumnsComponent extends NestedComponent {
       key: 'columns',
       type: 'columns',
       columns: [
-        { components: [], width: 6, offset: 0, push: 0, pull: 0 },
-        { components: [], width: 6, offset: 0, push: 0, pull: 0 }
+        { components: [], width: 6, offset: 0, push: 0, pull: 0, size: 'md' },
+        { components: [], width: 6, offset: 0, push: 0, pull: 0, size: 'md' }
       ],
       clearOnHide: false,
       input: false,
       tableView: false,
       persistent: false,
-      autoAdjust: false,
-      hideOnChildrenHidden: false
+      autoAdjust: false
     }, ...extend);
   }
 
   static get builderInfo() {
     return {
       title: 'Columns',
-      icon: 'fa fa-columns',
+      icon: 'columns',
       group: 'layout',
-      documentation: 'http://help.form.io/userguide/#columns',
+      documentation: '/userguide/#columns',
       weight: 10,
       schema: ColumnsComponent.schema()
     };
-  }
-
-  get defaultSchema() {
-    return ColumnsComponent.schema();
-  }
-
-  get schema() {
-    const schema = _.omit(super.schema, 'components');
-    schema.columns = [];
-    this.eachComponent((component, index) => {
-      _.merge(component.component, _.omit(this.component.columns[index], 'components'));
-      schema.columns.push(component.schema);
-    });
-    for (let i = this.components.length; i < this.component.columns.length; i++) {
-      schema.columns.push(this.component.columns[i]);
-    }
-    return schema;
   }
 
   constructor(component, options, data) {
@@ -53,46 +35,96 @@ export default class ColumnsComponent extends NestedComponent {
     this.rows = [];
   }
 
+  get schema() {
+    const schema = _.omit(super.schema, ['components']);
+    schema.columns?.map((column, colIndex) => {
+      column.components.map((comp, compIndex) => {
+        const clonedComp = _.clone(comp);
+        clonedComp.internal = true;
+        const component = this.createComponent(clonedComp);
+        delete component.component.internal;
+        schema.columns[colIndex].components[compIndex] = component.schema;
+      });
+    });
+    return schema;
+  }
+
+  get defaultSchema() {
+    return ColumnsComponent.schema();
+  }
+
   get className() {
     return `row ${super.className}`;
   }
 
+  get columnKey() {
+    return `column-${this.id}`;
+  }
+
+  init() {
+    super.init();
+    this.columns = [];
+    _.each(this.component.columns, (column, index) => {
+      this.columns[index] = [];
+      if (!column.size) {
+        column.size = 'md';
+      }
+      column.currentWidth = column.width || 0;
+      // Ensure there is a components array.
+      if (!Array.isArray(column.components)) {
+        column.components = [];
+      }
+      _.each(column.components, (comp) => {
+        const component = this.createComponent(comp);
+        component.column = index;
+        this.columns[index].push(component);
+      });
+    });
+    if (this.component.autoAdjust && this.options.display !== 'pdf') {
+      this.justify();
+    }
+    this.rows = this.groupByRow();
+  }
+
+  labelIsHidden() {
+    return true;
+  }
+
+  render() {
+    return super.render(this.renderTemplate('columns', {
+      columnKey: this.columnKey,
+      columnComponents: this.columns.map(column => this.renderComponents(column))
+    }));
+  }
+
+  justifyColumn(items, index) {
+    const toAdjust = _.every(items, item => !item.visible);
+    const column = this.component.columns[index];
+    const width = (toAdjust && items.length) ? 0 : column.width;
+    const shouldRedraw = !_.isEqual(width, column.currentWidth);
+
+    column.currentWidth = width;
+
+    return shouldRedraw;
+  }
+
+  justify() {
+    return this.columns.reduce((redraw, items, index) => this.justifyColumn(items, index) || redraw, false);
+  }
+
+  attach(element) {
+    this.loadRefs(element, { [this.columnKey]: 'multiple' });
+    const superAttach = super.attach(element);
+    if (this.refs[this.columnKey]) {
+      this.refs[this.columnKey].forEach((column, index) =>
+        this.attachComponents(column, this.columns[index], this.component.columns[index].components)
+      );
+    }
+    return superAttach;
+  }
+
   get gridSize() {
     return 12;
-  }
-
-  /** @type {number} */
-  get nbVisible() {
-    return _.filter(this.components, 'visible').length;
-  }
-
-  /**
-   * Justify columns width according to `this.gridSize`.
-   * @param {ColumnComponent[]} columns
-   * @return {*}
-   */
-  justifyRow(columns) {
-    const visible = _.filter(columns, 'visible');
-    const nbColumns = columns.length;
-    const nbVisible = visible.length;
-
-    if (nbColumns > 0 && nbVisible > 0) {
-      const w = Math.floor(this.gridSize / nbVisible);
-      const totalWidth = w * nbVisible;
-      const span = this.gridSize - totalWidth;
-
-      _.each(visible, column => {
-        column.component.width = w;
-      });
-
-      // In case when row is not fully filled,
-      // extending last col to fill empty space.
-      _.last(visible).component.width += span;
-
-      _.each(visible, col => {
-        col.element.setAttribute('class', col.className);
-      });
-    }
   }
 
   /**
@@ -118,36 +150,26 @@ export default class ColumnsComponent extends NestedComponent {
     return _.concat(result.rows, [result.stack]);
   }
 
-  justify() {
-    _.each(this.rows, this.justifyRow.bind(this));
+  checkData(data, flags, row, components) {
+    const isValid = super.checkData(data, flags, row, components);
+
+    if (this.component.autoAdjust && this.options.display !== 'pdf') {
+      const redraw = this.justify();
+
+      if (redraw) {
+        this.redraw();
+      }
+    }
+
+    return isValid;
   }
 
-  addComponents(element, data, options, state) {
-    const container = this.getContainer();
-    container.noDrop = true;
-    _.each(this.component.columns, (column) => {
-      column.type = 'column';
-      column.hideOnChildrenHidden = this.component.hideOnChildrenHidden;
-      this.addComponent(column, container, this.data, null, null, state);
-    });
-    this.rows = this.groupByRow();
-  }
-
-  checkConditions(data) {
-    if (this.component.autoAdjust) {
-      const result = super.checkConditions(data);
-
-      this.justify();
-
-      return result;
-    }
-    else {
-      return super.checkConditions(data);
-    }
+  detach(all) {
+    super.detach(all);
   }
 
   destroy() {
-    this.rows = [];
-    return super.destroy();
+    super.destroy();
+    this.columns = [];
   }
 }

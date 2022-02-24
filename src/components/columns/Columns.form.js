@@ -1,4 +1,4 @@
-import nestedComponentForm from '../nested/NestedComponent.form';
+import nestedComponentForm from '../_classes/nested/NestedComponent.form';
 
 import ColumnsEditDisplay from './editForm/Columns.edit.display';
 
@@ -7,6 +7,10 @@ export default function(...extend) {
     {
       key: 'display',
       components: ColumnsEditDisplay
-    }
+    },
+    {
+      key: 'addons',
+      ignore: true
+    },
   ], ...extend);
 }

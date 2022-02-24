@@ -1,9 +1,9 @@
+import Component from '../_classes/component/Component';
 import _ from 'lodash';
-import BaseComponent from '../base/Base';
 
-export default class HTMLComponent extends BaseComponent {
+export default class HTMLComponent extends Component {
   static schema(...extend) {
-    return BaseComponent.schema({
+    return Component.schema({
       label: 'HTML',
       type: 'htmlelement',
       tag: 'p',
@@ -17,10 +17,10 @@ export default class HTMLComponent extends BaseComponent {
   static get builderInfo() {
     return {
       title: 'HTML Element',
-      group: 'advanced',
-      icon: 'fa fa-code',
-      weight: 90,
-      documentation: 'http://help.form.io/userguide/#html-element-component',
+      group: 'layout',
+      icon: 'code',
+      weight: 0,
+      documentation: '/userguide/#html-element-component',
       schema: HTMLComponent.schema()
     };
   }
@@ -29,28 +29,65 @@ export default class HTMLComponent extends BaseComponent {
     return HTMLComponent.schema();
   }
 
-  setHTML() {
-    this.htmlElement.innerHTML = this.interpolate(this.component.content);
+  get content() {
+    if (this.builderMode) {
+      return this.component.content;
+    }
+
+    // i18n returns error exactly with word 'select', spaces will be trimmed
+    if (this.component.content.replace(/(<(\/?[^>]+)>)/g, '').trim() === 'select') {
+      return ` ${this.component.content} `;
+    }
+
+    const submission = _.get(this.root, 'submission', {});
+    const content = this.component.content ? this.interpolate(this.component.content, {
+      metadata: submission.metadata || {},
+      submission: submission,
+      data: this.rootValue,
+      row: this.data
+    }) : '';
+    return this.sanitize(content, this.shouldSanitizeValue);
   }
 
-  build() {
-    this.createElement();
-    this.htmlElement = this.ce(this.component.tag, {
-      id: this.id,
-      class: this.component.className
-    });
-    _.each(this.component.attrs, (attr) => {
-      if (attr.attr) {
-        this.htmlElement.setAttribute(attr.attr, attr.value);
-      }
-    });
-    if (this.component.content) {
-      this.setHTML();
+  get singleTags() {
+    return ['br', 'img', 'hr'];
+  }
+
+  checkRefreshOn(changed) {
+    super.checkRefreshOn(changed);
+    if (!this.builderMode && this.component.refreshOnChange && this.element &&
+      this.conditionallyVisible(this.data, this.row)) {
+      this.setContent(this.element, this.renderContent());
     }
-    if (this.component.refreshOnChange) {
-      this.on('change', () => this.setHTML(), true);
-    }
-    this.element.appendChild(this.htmlElement);
-    this.attachLogic();
+  }
+
+  renderContent() {
+    const submission = _.get(this.root, 'submission', {});
+    return this.renderTemplate('html', {
+      component: this.component,
+      tag: this.component.tag,
+      attrs: (this.component.attrs || []).map((attr) => {
+        return {
+          attr: attr.attr,
+          value: this.interpolate(attr.value, {
+            metadata: submission.metadata || {},
+            submission: submission,
+            data: this.rootValue,
+            row: this.data
+          })
+        };
+      }),
+      content: this.content,
+      singleTags: this.singleTags,
+    });
+  }
+
+  render() {
+    return super.render(this.renderContent());
+  }
+
+  attach(element) {
+    this.loadRefs(element, { html: 'single' });
+    return super.attach(element);
   }
 }

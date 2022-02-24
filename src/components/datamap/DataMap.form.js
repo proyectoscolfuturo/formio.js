@@ -1,19 +1,20 @@
-import baseEditForm from '../base/Base.form';
-
+import Components from '../Components';
+import DataMapEditData from './editForm/DataMap.edit.data';
 import DataMapEditDisplay from './editForm/DataMap.edit.display';
 
 export default function(...extend) {
-  return baseEditForm([
+  return Components.baseEditForm([
     {
       key: 'display',
       components: DataMapEditDisplay
     },
     {
       key: 'data',
-      components: [{
-        key: 'defaultValue',
-        ignore: true
-      }]
-    }
+      components: DataMapEditData
+    },
+    {
+      key: 'addons',
+      ignore: true
+    },
   ], ...extend);
 }

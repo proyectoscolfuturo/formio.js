@@ -1,9 +1,11 @@
-import baseEditForm from '../base/Base.form';
-
+import Components from '../Components';
+import EditGridEditData from './editForm/EditGrid.edit.data';
+import EditGridEditDisplay from './editForm/EditGrid.edit.display';
 import EditGridEditTemplates from './editForm/EditGrid.edit.templates';
+import EditGridEditValidation from './editForm/EditGrid.edit.validation';
 
 export default function(...extend) {
-  return baseEditForm([
+  return Components.baseEditForm([
     {
       label: 'Templates',
       key: 'templates',
@@ -11,11 +13,20 @@ export default function(...extend) {
       components: EditGridEditTemplates
     },
     {
+      key: 'display',
+      components: EditGridEditDisplay,
+    },
+    {
       key: 'data',
-      components: [{
-        key: 'defaultValue',
-        ignore: true
-      }]
-    }
+      components: EditGridEditData,
+    },
+    {
+      key: 'validation',
+      components: EditGridEditValidation
+    },
+    {
+      key: 'addons',
+      ignore: true
+    },
   ], ...extend);
 }

@@ -1,9 +1,10 @@
-import BaseComponent from '../base/Base';
+import Input from '../_classes/input/Input';
 
-export default class HiddenComponent extends BaseComponent {
+export default class HiddenComponent extends Input {
   static schema(...extend) {
-    return BaseComponent.schema({
+    return Input.schema({
       type: 'hidden',
+      tableView: false,
       inputType: 'hidden'
     }, ...extend);
   }
@@ -12,9 +13,9 @@ export default class HiddenComponent extends BaseComponent {
     return {
       title: 'Hidden',
       group: 'data',
-      icon: 'fa fa-user-secret',
+      icon: 'user-secret',
       weight: 0,
-      documentation: 'http://help.form.io/userguide/#hidden',
+      documentation: '/userguide/#hidden',
       schema: HiddenComponent.schema()
     };
   }
@@ -23,7 +24,7 @@ export default class HiddenComponent extends BaseComponent {
     return HiddenComponent.schema();
   }
 
-  elementInfo() {
+  get inputInfo() {
     const info = super.elementInfo();
     info.type = 'input';
     info.attr.type = 'hidden';
@@ -31,22 +32,30 @@ export default class HiddenComponent extends BaseComponent {
     return info;
   }
 
-  build() {
-    super.build();
-    if (this.options.builder) {
-      // We need to see it in builder mode.
-      this.append(this.text(this.name));
-    }
+  get skipInEmail() {
+    return true;
   }
 
-  createLabel() {
-    return;
+  /**
+   * Check if a component is eligible for multiple validation
+   *
+   * @return {boolean}
+   */
+  validateMultiple() {
+    // Since "arrays" are able to be stored in hidden components, we need to turn off multiple validation.
+    return false;
   }
 
-  setValue(value, flags) {
-    flags = this.getFlags.apply(this, arguments);
-    this.dataValue = value;
-    return this.updateValue(flags);
+  labelIsHidden() {
+    return true;
+  }
+
+  get emptyValue() {
+    return '';
+  }
+
+  setValue(value, flags = {}) {
+    return this.updateValue(value, flags);
   }
 
   getValue() {

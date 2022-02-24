@@ -4,7 +4,7 @@ export default [
     input: true,
     weight: 70,
     key: 'delimiter',
-    label: 'Use Delimiter',
+    label: 'Use Thousands Separator',
     tooltip: 'Separate thousands by local delimiter.'
   },
   {
@@ -22,5 +22,9 @@ export default [
     key: 'requireDecimal',
     label: 'Require Decimal',
     tooltip: 'Always show decimals, even if trailing zeros.'
-  }
+  },
+  {
+    key: 'case',
+    ignore: true,
+  },
 ];

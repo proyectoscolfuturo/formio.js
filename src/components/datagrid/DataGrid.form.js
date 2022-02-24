@@ -1,19 +1,25 @@
-import baseEditForm from '../base/Base.form';
-
+import Components from '../Components';
+import DataGridEditData from './editForm/DataGrid.edit.data';
 import DataGridEditDisplay from './editForm/DataGrid.edit.display';
+import DataGridEditValidation from './editForm/DataGrid.edit.validation';
 
 export default function(...extend) {
-  return baseEditForm([
+  return Components.baseEditForm([
     {
       key: 'display',
       components: DataGridEditDisplay
     },
     {
       key: 'data',
-      components: [{
-        key: 'defaultValue',
-        ignore: true
-      }]
-    }
+      components: DataGridEditData
+    },
+    {
+      key: 'validation',
+      components: DataGridEditValidation
+    },
+    {
+      key: 'addons',
+      ignore: true
+    },
   ], ...extend);
 }

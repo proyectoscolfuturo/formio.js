@@ -1,7 +1,7 @@
 /* globals StripeCheckout */
 import _ from 'lodash';
 import ButtonComponent from '../../../components/button/Button';
-import Formio from '../../../Formio';
+import { GlobalFormio as Formio } from '../../../Formio';
 
 export default class StripeCheckoutComponent extends ButtonComponent {
   constructor(component, options, data) {
@@ -26,13 +26,19 @@ export default class StripeCheckoutComponent extends ButtonComponent {
     this.component.action = 'event';
   }
 
+  static get builderInfo() {
+    return {
+      group: false,
+      schema: ButtonComponent.schema()
+    };
+  }
+
   getValue() {
     return this.dataValue;
   }
 
-  setValue(value, flags) {
-    flags = this.getFlags.apply(this, arguments);
-    return this.updateValue(flags);
+  setValue(value, flags = {}) {
+    return this.updateValue(value, flags);
   }
 
   /**
@@ -115,7 +121,7 @@ export default class StripeCheckoutComponent extends ButtonComponent {
       }
       this.handler = StripeCheckout.configure(handlerConfiguration);
 
-      this.on('customEvent', this.onClickButton.bind(this), true);
+      this.on('customEvent', this.onClickButton.bind(this));
 
       this.addEventListener(window, 'popstate', () => {
         this.handler.close();

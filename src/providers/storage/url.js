@@ -1,13 +1,18 @@
-import Promise from 'native-promise-only';
+import NativePromise from 'native-promise-only';
 
 const url = (formio) => {
-  const xhrRequest = (url, name, query, data, onprogress) => {
-    return new Promise((resolve, reject) => {
+  const xhrRequest = (url, name, query, data, options, progressCallback, abortCallback) => {
+    return new NativePromise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const json = (typeof data === 'string');
       const fd = new FormData();
-      if (typeof onprogress === 'function') {
-        xhr.upload.onprogress = onprogress;
+
+      if (typeof progressCallback === 'function') {
+        xhr.upload.onprogress = progressCallback;
+      }
+
+      if (typeof abortCallback === 'function') {
+        abortCallback(() => xhr.abort());
       }
 
       if (!json) {
@@ -45,7 +50,7 @@ const url = (formio) => {
       xhr.onerror = () => reject(xhr);
       xhr.onabort = () => reject(xhr);
 
-      let requestUrl = `${url}?`;
+      let requestUrl = url + (url.indexOf('?') > -1 ? '&' : '?');
       for (const key in query) {
         requestUrl += `${key}=${query[key]}&`;
       }
@@ -61,6 +66,14 @@ const url = (formio) => {
       if (token) {
         xhr.setRequestHeader('x-jwt-token', token);
       }
+
+      //Overrides previous request props
+      if (options) {
+        const parsedOptions = typeof options === 'string' ? JSON.parse(options) : options;
+        for (const prop in parsedOptions) {
+          xhr[prop] = parsedOptions[prop];
+        }
+      }
       xhr.send(json ? data : fd);
     });
   };
@@ -68,17 +81,17 @@ const url = (formio) => {
   return {
     title: 'Url',
     name: 'url',
-    uploadFile(file, name, dir, progressCallback, url) {
+    uploadFile(file, name, dir, progressCallback, url, options, fileKey, groupPermissions, groupId, abortCallback) {
       const uploadRequest = function(form) {
         return xhrRequest(url, name, {
           baseUrl: encodeURIComponent(formio.projectUrl),
           project: form ? form.project : '',
           form: form ? form._id : ''
         }, {
-          file,
+          [fileKey]:file,
           name,
           dir
-        }, progressCallback).then(response => {
+        }, options, progressCallback, abortCallback).then(response => {
           // Store the project and form url along with the metadata.
           response.data = response.data || {};
           response.data.baseUrl = formio.projectUrl;
@@ -101,6 +114,22 @@ const url = (formio) => {
         return uploadRequest();
       }
     },
+    deleteFile(fileInfo) {
+      return new NativePromise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('DELETE', fileInfo.url, true);
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve('File deleted');
+          }
+          else {
+            reject(xhr.response || 'Unable to delete file');
+          }
+        };
+        xhr.send(null);
+      });
+    },
+
     downloadFile(file) {
       if (file.private) {
         if (formio.submissionId && file.data) {
@@ -110,7 +139,7 @@ const url = (formio) => {
       }
 
       // Return the original as there is nothing to do.
-      return Promise.resolve(file);
+      return NativePromise.resolve(file);
     }
   };
 };

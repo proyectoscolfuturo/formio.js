@@ -1,12 +1,23 @@
-import baseEditForm from '../base/Base.form';
-
+import Components from '../Components';
 import ButtonEditDisplay from './editForm/Button.edit.display';
 
 export default function(...extend) {
-  return baseEditForm([
+  return Components.baseEditForm([
     {
       key: 'display',
       components: ButtonEditDisplay
-    }
+    },
+    {
+      key: 'data',
+      ignore: true,
+    },
+    {
+      key: 'validation',
+      ignore: true,
+    },
+    {
+      key: 'addons',
+      ignore: true
+    },
   ], ...extend);
 }

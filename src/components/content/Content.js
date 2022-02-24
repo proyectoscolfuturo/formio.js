@@ -1,8 +1,10 @@
-import BaseComponent from '../base/Base';
+import Component from '../_classes/component/Component';
+import _ from 'lodash';
+import NativePromise from 'native-promise-only';
 
-export default class ContentComponent extends BaseComponent {
+export default class ContentComponent extends Component {
   static schema(...extend) {
-    return BaseComponent.schema({
+    return Component.schema({
       label: 'Content',
       type: 'content',
       key: 'content',
@@ -14,10 +16,11 @@ export default class ContentComponent extends BaseComponent {
   static get builderInfo() {
     return {
       title: 'Content',
-      group: 'basic',
-      icon: 'fa fa-html5',
-      documentation: 'http://help.form.io/userguide/#content-component',
-      weight: 100,
+      group: 'layout',
+      icon: 'html5',
+      preview: false,
+      documentation: '/userguide/#content-component',
+      weight: 5,
       schema: ContentComponent.schema()
     };
   }
@@ -26,50 +29,49 @@ export default class ContentComponent extends BaseComponent {
     return ContentComponent.schema();
   }
 
-  setHTML() {
-    this.htmlElement.innerHTML = this.interpolate(this.component.html);
+  get content() {
+    if (this.builderMode) {
+      return this.component.html;
+    }
+    const submission = _.get(this.root, 'submission', {});
+    return this.component.html ? this.interpolate(this.component.html, {
+      metadata: submission.metadata || {},
+      submission: submission,
+      data: this.rootValue,
+      row: this.data
+    }) : '';
   }
 
-  build() {
-    this.createElement();
-    this.htmlElement = this.ce('div', {
-      id: this.id,
-      class: `form-group ${this.component.className}`
-    });
+  render() {
+    return super.render(this.renderTemplate('html', {
+      tag: 'div',
+      attrs: [],
+      content: this.content,
+    }));
+  }
 
-    this.htmlElement.component = this;
+  get dataReady() {
+    return this.root?.submissionReady || NativePromise.resolve();
+  }
 
-    if (this.options.builder) {
-      const editorElement = this.ce('div');
-      this.element.appendChild(editorElement);
-      this.editorReady = this.addCKE(editorElement, null, (html) => {
-        this.component.html = html;
-      }).then((editor) => {
-        this.editor = editor;
-        this.editor.data.set(this.component.html);
-        return editor;
-      }).catch(err => console.warn(err));
-    }
-    else {
-      this.setHTML();
-      if (this.component.refreshOnChange) {
-        this.on('change', () => this.setHTML(), true);
+  attach(element) {
+    this.loadRefs(element, { html: 'single' });
+    this.dataReady.then(() => {
+      if (this.refs.html) {
+        this.setContent(this.refs.html, this.content);
       }
+    });
+    if (this.component.refreshOnChange) {
+      this.on('change', () => {
+        if (this.refs.html) {
+          this.setContent(this.refs.html, this.content);
+        }
+      }, true);
     }
-
-    this.element.appendChild(this.htmlElement);
-    this.attachLogic();
+    return super.attach(element);
   }
 
   get emptyValue() {
     return '';
-  }
-
-  destroy() {
-    const state = super.destroy();
-    if (this.editor) {
-      this.editor.destroy();
-    }
-    return state;
   }
 }

@@ -490,7 +490,7 @@
     "size": "md",
     "key": "submit",
     "tableView": false,
-    "label": "Guardar",
+    "label": "Submit",
     "input": true
   }
 ]

@@ -1,13 +1,19 @@
 /* global $ */
 
 import _ from 'lodash';
-import 'whatwg-fetch';
+import fetchPonyfill from 'fetch-ponyfill';
 import jsonLogic from 'json-logic-js';
 import moment from 'moment-timezone/moment-timezone';
 import jtz from 'jstimezonedetect';
 import { lodashOperators } from './jsonlogic/operators';
-import Promise from 'native-promise-only';
+import NativePromise from 'native-promise-only';
+import dompurify from 'dompurify';
 import { getValue } from './formUtils';
+import Evaluator from './Evaluator';
+const interpolate = Evaluator.interpolate;
+const { fetch } = fetchPonyfill({
+  Promise: NativePromise
+});
 
 export * from './formUtils';
 
@@ -31,6 +37,14 @@ jsonLogic.add_operation('relativeMaxDate', (relativeMaxDate) => {
 
 export { jsonLogic, moment };
 
+function setPathToComponentAndPerentSchema(component) {
+  component.path = getComponentPath(component);
+  const dataParent = getDataParentComponent(component);
+  if (dataParent && typeof dataParent === 'object') {
+    dataParent.path = getComponentPath(dataParent);
+  }
+}
+
 /**
  * Evaluate a method.
  *
@@ -44,11 +58,13 @@ export function evaluate(func, args, ret, tokenize) {
   if (!args.form && args.instance) {
     args.form = _.get(args.instance, 'root._form', {});
   }
+
+  const componentKey = component.key;
+
   if (typeof func === 'string') {
     if (ret) {
       func += `;return ${ret}`;
     }
-    const params = _.keys(args);
 
     if (tokenize) {
       // Replace all {{ }} references with actual data.
@@ -66,22 +82,23 @@ export function evaluate(func, args, ret, tokenize) {
     }
 
     try {
-      func = new Function(...params, func);
+      func = Evaluator.evaluator(func, args);
       args = _.values(args);
     }
     catch (err) {
-      console.warn(`An error occured within the custom function for ${component.key}`, err);
+      console.warn(`An error occured within the custom function for ${componentKey}`, err);
       returnVal = null;
       func = false;
     }
   }
+
   if (typeof func === 'function') {
     try {
-      returnVal = Array.isArray(args) ? func(...args) : func(args);
+      returnVal = Evaluator.evaluate(func, args);
     }
     catch (err) {
       returnVal = null;
-      console.warn(`An error occured within custom function for ${component.key}`, err);
+      console.warn(`An error occured within custom function for ${componentKey}`, err);
     }
   }
   else if (typeof func === 'object') {
@@ -90,11 +107,11 @@ export function evaluate(func, args, ret, tokenize) {
     }
     catch (err) {
       returnVal = null;
-      console.warn(`An error occured within custom function for ${component.key}`, err);
+      console.warn(`An error occured within custom function for ${componentKey}`, err);
     }
   }
   else if (func) {
-    console.warn(`Unknown function type for ${component.key}`);
+    console.warn(`Unknown function type for ${componentKey}`);
   }
   return returnVal;
 }
@@ -233,7 +250,7 @@ export function checkCustomConditional(component, custom, row, data, form, varia
     custom = `var ${variable} = true; ${custom}; return ${variable};`;
   }
   const value = (instance && instance.evaluate) ?
-    instance.evaluate(custom) :
+    instance.evaluate(custom, { row, data, form }) :
     evaluate(custom, { row, data, form });
   if (value === null) {
     return onError;
@@ -247,13 +264,31 @@ export function checkJsonConditional(component, json, row, data, form, onError) 
       data,
       row,
       form,
-      _
+      _,
     });
   }
   catch (err) {
     console.warn(`An error occurred in jsonLogic advanced condition for ${component.key}`, err);
     return onError;
   }
+}
+
+function getRow(component, row, instance, conditional) {
+  const condition = conditional || component.conditional;
+  // If no component's instance passed (happens only in 6.x server), calculate its path based on the schema
+  if (!instance) {
+    instance = _.cloneDeep(component);
+    setPathToComponentAndPerentSchema(instance);
+  }
+  const dataParent = getDataParentComponent(instance);
+  const parentPath = dataParent ? getComponentPath(dataParent) : null;
+  if (dataParent && condition.when?.startsWith(parentPath)) {
+    const newRow = {};
+    _.set(newRow, parentPath, row);
+    row = newRow;
+  }
+
+  return row;
 }
 
 /**
@@ -269,14 +304,16 @@ export function checkJsonConditional(component, json, row, data, form, onError) 
  * @returns {boolean}
  */
 export function checkCondition(component, row, data, form, instance) {
-  if (component.customConditional) {
-    return checkCustomConditional(component, component.customConditional, row, data, form, 'show', true, instance);
+  const { customConditional, conditional } = component;
+  if (customConditional) {
+    return checkCustomConditional(component, customConditional, row, data, form, 'show', true, instance);
   }
-  else if (component.conditional && component.conditional.when) {
-    return checkSimpleConditional(component, component.conditional, row, data, true);
+  else if (conditional && conditional.when) {
+    row = getRow(component, row, instance);
+    return checkSimpleConditional(component, conditional, row, data);
   }
-  else if (component.conditional && component.conditional.json) {
-    return checkJsonConditional(component, component.conditional.json, row, data, form, instance);
+  else if (conditional && conditional.json) {
+    return checkJsonConditional(component, conditional.json, row, data, form, true);
   }
 
   // Default to show.
@@ -293,8 +330,14 @@ export function checkCondition(component, row, data, form, instance) {
  * @returns {mixed}
  */
 export function checkTrigger(component, trigger, row, data, form, instance) {
+  // If trigger is empty, don't fire it
+  if (!trigger[trigger.type]) {
+    return false;
+  }
+
   switch (trigger.type) {
     case 'simple':
+      row = getRow(component, row, instance, trigger.simple);
       return checkSimpleConditional(component, trigger.simple, row, data);
     case 'javascript':
       return checkCustomConditional(component, trigger.javascript, row, data, form, 'result', false, instance);
@@ -305,66 +348,97 @@ export function checkTrigger(component, trigger, row, data, form, instance) {
   return false;
 }
 
-export function setActionProperty(component, action, row, data, result, instance) {
+export function setActionProperty(component, action, result, row, data, instance) {
+  const property = action.property.value;
+
   switch (action.property.type) {
-    case 'boolean':
-      if (_.get(component, action.property.value, false).toString() !== action.state.toString()) {
-        _.set(component, action.property.value, action.state.toString() === 'true');
+    case 'boolean': {
+      const currentValue = _.get(component, property, false).toString();
+      const newValue = action.state.toString();
+
+      if (currentValue !== newValue) {
+        _.set(component, property, newValue === 'true');
       }
+
       break;
+    }
     case 'string': {
       const evalData = {
         data,
         row,
         component,
-        result
+        result,
       };
       const textValue = action.property.component ? action[action.property.component] : action.text;
-      const newValue = (instance && instance.interpolate) ?
-        instance.interpolate(textValue, evalData) :
-        interpolate(textValue, evalData);
-      if (newValue !== _.get(component, action.property.value, '')) {
-        _.set(component, action.property.value, newValue);
+      const currentValue = _.get(component, property, '');
+      const newValue = (instance && instance.interpolate)
+        ? instance.interpolate(textValue, evalData)
+        : Evaluator.interpolate(textValue, evalData);
+
+      if (newValue !== currentValue) {
+        _.set(component, property, newValue);
       }
+
       break;
     }
   }
+
   return component;
 }
 
 /**
- * Interpolate a string and add data replacements.
- *
- * @param string
- * @param data
- * @returns {XML|string|*|void}
+ * Unescape HTML characters like &lt, &gt, &amp and etc.
+ * @param str
+ * @returns {string}
  */
-export function interpolate(string, data) {
-  const templateSettings = {
-    evaluate: /\{%(.+?)%\}/g,
-    interpolate: /\{\{(.+?)\}\}/g,
-    escape: /\{\{\{(.+?)\}\}\}/g
-  };
-  try {
-    return _.template(string, templateSettings)(data);
+export function unescapeHTML(str) {
+  if (typeof window === 'undefined' || !('DOMParser' in window)) {
+    return str;
   }
-  catch (err) {
-    console.warn('Error interpolating template', err, string, data);
-  }
+
+  const doc = new window.DOMParser().parseFromString(str, 'text/html');
+  return doc.documentElement.textContent;
+}
+
+/**
+ * Make HTML element from string
+ * @param str
+ * @param selector
+ * @returns {HTMLElement}
+ */
+
+export function convertStringToHTMLElement(str, selector) {
+  const doc = new window.DOMParser().parseFromString(str, 'text/html');
+  return doc.body.querySelector(selector);
 }
 
 /**
  * Make a filename guaranteed to be unique.
  * @param name
+ * @param template
+ * @param evalContext
  * @returns {string}
  */
-export function uniqueName(name) {
-  const parts = name.toLowerCase().replace(/[^0-9a-z.]/g, '').split('.');
-  const fileName = parts[0];
-  const ext = parts.length > 1
+export function uniqueName(name, template, evalContext) {
+  template = template || '{{fileName}}-{{guid}}';
+  //include guid in template anyway, to prevent overwriting issue if filename matches existing file
+  if (!template.includes('{{guid}}')) {
+    template = `${template}-{{guid}}`;
+  }
+  const parts = name.split('.');
+  let fileName = parts.slice(0, parts.length - 1).join('.');
+  const extension = parts.length > 1
     ? `.${_.last(parts)}`
     : '';
-  return `${fileName.substr(0, 10)}-${guid()}${ext}`;
+  //allow only 100 characters from original name to avoid issues with filename length restrictions
+  fileName = fileName.substr(0, 100);
+  evalContext = Object.assign(evalContext || {}, {
+    fileName,
+    guid: guid()
+  });
+  //only letters, numbers, dots, dashes, underscores and spaces are allowed. Anything else will be replaced with dash
+  const uniqueName = `${Evaluator.interpolate(template, evalContext)}${extension}`.replace(/[^0-9a-zA-Z.\-_ ]/g, '-');
+  return uniqueName;
 }
 
 export function guid() {
@@ -402,7 +476,7 @@ export function getDateSetting(date) {
 
   dateSetting = null;
   try {
-    const value = (new Function('moment', `return ${date};`))(moment);
+    const value = Evaluator.evaluator(`return ${date};`, 'moment')(moment);
     if (typeof value === 'string') {
       dateSetting = moment(value);
     }
@@ -497,14 +571,14 @@ export function shouldLoadZones(timezone) {
 export function loadZones(timezone) {
   if (timezone && !shouldLoadZones(timezone)) {
     // Return non-resolving promise.
-    return new Promise(_.noop);
+    return new NativePromise(_.noop);
   }
 
   if (moment.zonesPromise) {
     return moment.zonesPromise;
   }
   return moment.zonesPromise = fetch(
-    'https://formio.github.io/formio.js/resources/latest.json',
+    'https://cdn.form.io/moment-timezone/data/packed/latest.json',
   ).then(resp => resp.json().then(zones => {
     moment.tz.load(zones);
     moment.zonesLoaded = true;
@@ -545,8 +619,8 @@ export function momentDate(value, format, timezone) {
  * @param timezone
  * @return {string}
  */
-export function formatDate(value, format, timezone) {
-  const momentDate = moment(value);
+export function formatDate(value, format, timezone, flatPickrInputFormat) {
+  const momentDate = moment(value, flatPickrInputFormat || undefined);
   if (timezone === currentTimezone()) {
     // See if our format contains a "z" timezone character.
     if (format.match(/\s(z$|z\s)/)) {
@@ -569,7 +643,7 @@ export function formatDate(value, format, timezone) {
 
   // Load the zones since we need timezone information.
   loadZones();
-  if (moment.zonesLoaded) {
+  if (moment.zonesLoaded && timezone) {
     return momentDate.tz(timezone).format(`${convertFormatToMoment(format)} z`);
   }
   else {
@@ -648,7 +722,7 @@ export function convertFormatToFlatpickr(format) {
 
     // Hours, minutes, seconds
     .replace('HH', 'H')
-    .replace('hh', 'h')
+    .replace('hh', 'G')
     .replace('mm', 'i')
     .replace('ss', 'S')
     .replace(/a/g, 'K');
@@ -661,32 +735,39 @@ export function convertFormatToFlatpickr(format) {
  */
 export function convertFormatToMoment(format) {
   return format
-    // Year conversion.
+  // Year conversion.
     .replace(/y/g, 'Y')
     // Day in month.
     .replace(/d/g, 'D')
     // Day in week.
     .replace(/E/g, 'd')
     // AM/PM marker
-    .replace(/a/g, 'A');
+    .replace(/a/g, 'A')
+    // Unix Timestamp
+    .replace(/U/g, 'X');
 }
 
 export function convertFormatToMask(format) {
   return format
-    // Short and long month replacement.
-    .replace(/(MMM|MMMM)/g, 'MM')
-    // Year conversion
-    .replace(/[ydhmsHM]/g, '9')
-    // AM/PM conversion
+  // Long month replacement.
+    .replace(/M{4}/g, 'MM')
+    // Initial short month conversion.
+    .replace(/M{3}/g, '***')
+    // Short month conversion if input as text.
+    .replace(/e/g, 'Q')
+    // Year conversion.
+    .replace(/[ydhmsHMG]/g, '9')
+    // AM/PM conversion.
     .replace(/a/g, 'AA');
 }
 
 /**
  * Returns an input mask that is compatible with the input mask library.
  * @param {string} mask - The Form.io input mask.
+ * @param {string} placeholderChar - Char which is used as a placeholder.
  * @returns {Array} - The input mask for the mask library.
  */
-export function getInputMask(mask) {
+export function getInputMask(mask, placeholderChar) {
   if (mask instanceof Array) {
     return mask;
   }
@@ -709,7 +790,13 @@ export function getInputMask(mask) {
         maskArray.numeric = false;
         maskArray.push(/[a-zA-Z0-9]/);
         break;
+      // If char which is used inside mask placeholder was used in the mask, replace it with space to prevent errors
+      case placeholderChar:
+        maskArray.numeric = false;
+        maskArray.push(' ');
+        break;
       default:
+        maskArray.numeric = false;
         maskArray.push(mask[i]);
         break;
     }
@@ -717,12 +804,39 @@ export function getInputMask(mask) {
   return maskArray;
 }
 
+export function unmaskValue(value, mask, placeholderChar) {
+  if (!mask || !value || value.length > mask.length) {
+    return value;
+  }
+
+  let unmaskedValue = value.split('');
+
+  for (let i = 0; i < mask.length; i++) {
+    const char = value[i] || '';
+    const charPart = mask[i];
+
+    if (!_.isRegExp(charPart) && char === charPart) {
+      unmaskedValue[i] = '';
+    }
+  }
+
+  unmaskedValue = unmaskedValue.join('').replace(placeholderChar, '');
+
+  return unmaskedValue;
+}
+
 export function matchInputMask(value, inputMask) {
   if (!inputMask) {
     return true;
   }
+
+  // If value is longer than mask, it isn't valid.
+  if (value.length > inputMask.length) {
+    return false;
+  }
+
   for (let i = 0; i < inputMask.length; i++) {
-    const char = value[i];
+    const char = value[i] || '';
     const charPart = inputMask[i];
 
     if (!(_.isRegExp(charPart) && charPart.test(char) || charPart === char)) {
@@ -748,9 +862,12 @@ export function getNumberSeparators(lang = 'en') {
   };
 }
 
-export function getNumberDecimalLimit(component) {
+export function getNumberDecimalLimit(component, defaultLimit) {
+  if (_.has(component, 'decimalLimit')) {
+    return _.get(component, 'decimalLimit');
+  }
   // Determine the decimal limit. Defaults to 20 but can be overridden by validate.step or decimalLimit settings.
-  let decimalLimit = 20;
+  let decimalLimit = defaultLimit || 20;
   const step = _.get(component, 'validate.step', 'any');
 
   if (step !== 'any') {
@@ -764,27 +881,27 @@ export function getNumberDecimalLimit(component) {
 }
 
 export function getCurrencyAffixes({
-  currency = 'USD',
-  decimalLimit,
-  decimalSeparator,
-  lang,
-}) {
+   currency = 'USD',
+   decimalLimit,
+   decimalSeparator,
+   lang,
+ }) {
   // Get the prefix and suffix from the localized string.
-  let regex = '(.*)?100';
+  let regex = `(.*)?${(100).toLocaleString(lang)}`;
   if (decimalLimit) {
-    regex += `${decimalSeparator === '.' ? '\\.' : decimalSeparator}0{${decimalLimit}}`;
+    regex += `${decimalSeparator === '.' ? '\\.' : decimalSeparator}${(0).toLocaleString(lang)}{${decimalLimit}}`;
   }
   regex += '(.*)?';
   const parts = (100).toLocaleString(lang, {
     style: 'currency',
     currency,
     useGrouping: true,
-    maximumFractionDigits: decimalLimit,
-    minimumFractionDigits: decimalLimit
+    maximumFractionDigits: decimalLimit || 0,
+    minimumFractionDigits: decimalLimit || 0
   }).replace('.', decimalSeparator).match(new RegExp(regex));
   return {
-    prefix: parts[1] || '',
-    suffix: parts[2] || ''
+    prefix: parts?.[1] || '',
+    suffix: parts?.[2] || ''
   };
 }
 
@@ -834,6 +951,12 @@ export function fieldData(data, component) {
     if (component.multiple && !Array.isArray(data[component.key])) {
       data[component.key] = [data[component.key]];
     }
+
+    // Fix for checkbox type radio submission values in tableView
+    if (component.type === 'checkbox' && component.inputType === 'radio') {
+      return data[component.name] === component.value;
+    }
+
     return data[component.key];
   }
 }
@@ -874,7 +997,7 @@ export function delay(fn, delay = 0, ...args) {
  */
 export function iterateKey(key) {
   if (!key.match(/(\d+)$/)) {
-    return `${key}2`;
+    return `${key}1`;
   }
 
   return key.replace(/(\d+)$/, function(suffix) {
@@ -902,9 +1025,475 @@ export function uniqueKey(map, base) {
  *
  * @return {number}
  */
-export function bootstrapVersion() {
+export function bootstrapVersion(options) {
+  if (options.bootstrap) {
+    return options.bootstrap;
+  }
   if ((typeof $ === 'function') && (typeof $().collapse === 'function')) {
     return parseInt($.fn.collapse.Constructor.VERSION.split('.')[0], 10);
   }
   return 0;
 }
+
+/**
+ * Retrun provided argument.
+ * If argument is a function, returns the result of a function call.
+ * @param {*} e;
+ *
+ * @return {*}
+ */
+export function unfold(e) {
+  if (typeof e === 'function') {
+    return e();
+  }
+
+  return e;
+}
+
+/**
+ * Map values through unfold and return first non-nil value.
+ * @param {Array<T>} collection;
+ *
+ * @return {T}
+ */
+export const firstNonNil = _.flow([
+  _.partialRight(_.map, unfold),
+  _.partialRight(_.find, v => !_.isUndefined(v))
+]);
+
+/*
+ * Create enclosed state.
+ * Returns functions to getting and cycling between states.
+ * @param {*} a - initial state.
+ * @param {*} b - next state.
+ * @return {Functions[]} -- [get, toggle];
+ */
+export function withSwitch(a, b) {
+  let state = a;
+  let next = b;
+
+  function get() {
+    return state;
+  }
+
+  function toggle() {
+    const prev = state;
+    state = next;
+    next = prev;
+  }
+
+  return [get, toggle];
+}
+
+export function observeOverload(callback, options = {}) {
+  const { limit = 50, delay = 500 } = options;
+  let callCount = 0;
+  let timeoutID = 0;
+
+  const reset = () => callCount = 0;
+
+  return () => {
+    if (timeoutID !== 0) {
+      clearTimeout(timeoutID);
+      timeoutID = 0;
+    }
+
+    timeoutID = setTimeout(reset, delay);
+
+    callCount += 1;
+
+    if (callCount >= limit) {
+      clearTimeout(timeoutID);
+      reset();
+      return callback();
+    }
+  };
+}
+
+export function getContextComponents(context) {
+  const values = [];
+
+  context.utils.eachComponent(context.instance.options.editForm.components, (component, path) => {
+    if (component.key !== context.data.key) {
+      values.push({
+        label: `${component.label || component.key} (${path})`,
+        value: path,
+      });
+    }
+  });
+
+  return values;
+}
+
+export function getContextButtons(context) {
+  const values = [];
+
+  context.utils.eachComponent(context.instance.options.editForm.components, (component) => {
+    if (component.type === 'button') {
+      values.push({
+        label: `${component.key} (${component.label})`,
+        value: component.key,
+      });
+    }
+  });
+
+  return values;
+}
+
+// Tags that could be in text, that should be ommited or handled in a special way
+const inTextTags = ['#text', 'A', 'B', 'EM', 'I', 'SMALL', 'STRONG', 'SUB', 'SUP', 'INS', 'DEL', 'MARK', 'CODE'];
+
+/**
+ * Helper function for 'translateHTMLTemplate'. Translates text value of the passed html element.
+ *
+ * @param {HTMLElement} elem
+ * @param {Function} translate
+ *
+ * @returns {String}
+ *   Translated element template.
+ */
+function translateElemValue(elem, translate) {
+  if (!elem.innerText) {
+    return elem.innerHTML;
+  }
+
+  const elemValue = elem.innerText.replace(Evaluator.templateSettings.interpolate, '').replace(/\s\s+/g, ' ').trim();
+  const translatedValue = translate(elemValue);
+
+  if (elemValue !== translatedValue) {
+    const links = elem.innerHTML.match(/<a[^>]*>(.*?)<\/a>/g);
+
+    if (links && links.length) {
+      if (links.length === 1 && links[0].length === elem.innerHTML.length) {
+        return elem.innerHTML.replace(elemValue, translatedValue);
+      }
+
+      const translatedLinks = links.map(link => {
+        const linkElem = document.createElement('a');
+        linkElem.innerHTML = link;
+        return translateElemValue(linkElem, translate);
+      });
+
+      return `${translatedValue} (${translatedLinks.join(', ')})`;
+    }
+    else {
+      return elem.innerText.replace(elemValue, translatedValue);
+    }
+  }
+  else {
+    return elem.innerHTML;
+  }
+}
+
+/**
+ * Helper function for 'translateHTMLTemplate'. Goes deep through html tag children and calls function to translate their text values.
+ *
+ * @param {HTMLElement} tag
+ * @param {Function} translate
+ *
+ * @returns {void}
+ */
+function translateDeepTag(tag, translate) {
+  const children = tag.children.length && [...tag.children];
+  const shouldTranslateEntireContent = children && children.every(child =>
+    child.children.length === 0
+    && inTextTags.some(tag => child.nodeName === tag)
+  );
+
+  if (!children || shouldTranslateEntireContent) {
+    tag.innerHTML = translateElemValue(tag, translate);
+  }
+  else {
+    children.forEach(child => translateDeepTag(child, translate));
+  }
+}
+
+/**
+ * Translates text values in html template.
+ *
+ * @param {String} template
+ * @param {Function} translate
+ *
+ * @returns {String}
+ *   Html template with translated values.
+ */
+export function translateHTMLTemplate(template, translate) {
+  const isHTML = /<[^>]*>/.test(template);
+
+  if (!isHTML) {
+    return translate(template);
+  }
+
+  const tempElem = document.createElement('div');
+  tempElem.innerHTML = template;
+
+  if (tempElem.innerText && tempElem.children.length) {
+    translateDeepTag(tempElem, translate);
+    return tempElem.innerHTML;
+  }
+
+  return template;
+}
+
+/**
+ * Sanitize an html string.
+ *
+ * @param string
+ * @returns {*}
+ */
+export function sanitize(string, options) {
+  if (typeof dompurify.sanitize !== 'function') {
+    return string;
+  }
+  // Dompurify configuration
+  const sanitizeOptions = {
+    ADD_ATTR: ['ref', 'target'],
+    USE_PROFILES: { html: true }
+  };
+  // Add attrs
+  if (options.sanitizeConfig && Array.isArray(options.sanitizeConfig.addAttr) && options.sanitizeConfig.addAttr.length > 0) {
+    options.sanitizeConfig.addAttr.forEach((attr) => {
+      sanitizeOptions.ADD_ATTR.push(attr);
+    });
+  }
+  // Add tags
+  if (options.sanitizeConfig && Array.isArray(options.sanitizeConfig.addTags) && options.sanitizeConfig.addTags.length > 0) {
+    sanitizeOptions.ADD_TAGS = options.sanitizeConfig.addTags;
+  }
+  // Allow tags
+  if (options.sanitizeConfig && Array.isArray(options.sanitizeConfig.allowedTags) && options.sanitizeConfig.allowedTags.length > 0) {
+    sanitizeOptions.ALLOWED_TAGS = options.sanitizeConfig.allowedTags;
+  }
+  // Allow attributes
+  if (options.sanitizeConfig && Array.isArray(options.sanitizeConfig.allowedAttrs) && options.sanitizeConfig.allowedAttrs.length > 0) {
+    sanitizeOptions.ALLOWED_ATTR = options.sanitizeConfig.allowedAttrs;
+  }
+  // Allowd URI Regex
+  if (options.sanitizeConfig && options.sanitizeConfig.allowedUriRegex) {
+    sanitizeOptions.ALLOWED_URI_REGEXP = options.sanitizeConfig.allowedUriRegex;
+  }
+  // Allow to extend the existing array of elements that are safe for URI-like values
+  if (options.sanitizeConfig && Array.isArray(options.sanitizeConfig.addUriSafeAttr) && options.sanitizeConfig.addUriSafeAttr.length > 0) {
+    sanitizeOptions.ADD_URI_SAFE_ATTR = options.sanitizeConfig.addUriSafeAttr;
+  }
+  return dompurify.sanitize(string, sanitizeOptions);
+}
+
+/**
+ * Fast cloneDeep for JSON objects only.
+ */
+export function fastCloneDeep(obj) {
+  return obj ? JSON.parse(JSON.stringify(obj)) : obj;
+}
+
+export { Evaluator, interpolate };
+
+export function isInputComponent(componentJson) {
+  if (componentJson.input === false || componentJson.input === true) {
+    return componentJson.input;
+  }
+  switch (componentJson.type) {
+    case 'htmlelement':
+    case 'content':
+    case 'columns':
+    case 'fieldset':
+    case 'panel':
+    case 'table':
+    case 'tabs':
+    case 'well':
+    case 'button':
+      return false;
+    default:
+      return true;
+  }
+}
+
+export function getArrayFromComponentPath(pathStr) {
+  if (!pathStr || !_.isString(pathStr)) {
+    if (!_.isArray(pathStr)) {
+      return [pathStr];
+    }
+    return pathStr;
+  }
+  return pathStr.replace(/[[\]]/g, '.')
+    .replace(/\.\./g, '.')
+    .replace(/(^\.)|(\.$)/g, '')
+    .split('.')
+    .map(part => _.defaultTo(_.toNumber(part), part));
+}
+
+export function  hasInvalidComponent(component) {
+  return component.getComponents().some((comp) => {
+    if (_.isArray(comp.components)) {
+      return hasInvalidComponent(comp);
+    }
+      return comp.error;
+  });
+}
+
+export function getStringFromComponentPath(path) {
+  if (!_.isArray(path)) {
+    return path;
+  }
+  let strPath = '';
+  path.forEach((part, i) => {
+    if (_.isNumber(part)) {
+      strPath += `[${part}]`;
+    }
+    else {
+      strPath += i === 0 ? part : `.${part}`;
+    }
+  });
+  return strPath;
+}
+
+export function round(number, precision) {
+  if (_.isNumber(number)) {
+    return number.toFixed(precision);
+  }
+  return number;
+}
+
+/**
+ * Check for Internet Explorer browser version
+ *
+ * @return {(number|null)}
+ */
+export function getIEBrowserVersion() {
+  const { ie, version } = getBrowserInfo();
+
+  return ie ? version : null;
+}
+
+/**
+ * Get browser name and version (modified from 'jquery-browser-plugin')
+ *
+ * @return {Object} -- {{browser name, version, isWebkit?}}
+ * Possible browser names: chrome, safari, ie, edge, opera, mozilla, yabrowser
+ */
+export function getBrowserInfo() {
+  const browser = {};
+
+  if (typeof window === 'undefined') {
+    return browser;
+  }
+
+  const ua = window.navigator.userAgent.toLowerCase();
+  const match = /(edge|edg)\/([\w.]+)/.exec(ua) ||
+                /(opr)[/]([\w.]+)/.exec(ua) ||
+                /(yabrowser)[ /]([\w.]+)/.exec(ua) ||
+                /(chrome)[ /]([\w.]+)/.exec(ua) ||
+                /(iemobile)[/]([\w.]+)/.exec(ua) ||
+                /(version)(applewebkit)[ /]([\w.]+).*(safari)[ /]([\w.]+)/.exec(ua) ||
+                /(webkit)[ /]([\w.]+).*(version)[ /]([\w.]+).*(safari)[ /]([\w.]+)/.exec(ua) ||
+                /(webkit)[ /]([\w.]+)/.exec(ua) ||
+                /(opera)(?:.*version|)[ /]([\w.]+)/.exec(ua) ||
+                /(msie) ([\w.]+)/.exec(ua) ||
+                ua.indexOf('trident') >= 0 && /(rv)(?::| )([\w.]+)/.exec(ua) ||
+                ua.indexOf('compatible') < 0 && /(mozilla)(?:.*? rv:([\w.]+)|)/.exec(ua) ||
+                [];
+  const matched = {
+    browser: match[5] || match[3] || match[1] || '',
+    version: match[4] || match[2] || '0'
+  };
+
+  if (matched.browser) {
+    browser[matched.browser] = true;
+    browser.version = parseInt(matched.version, 10);
+  }
+  // Chrome, Opera 15+, Safari and Yandex.Browser are webkit based browsers
+  if (browser.chrome || browser.opr || browser.safari || browser.edg || browser.yabrowser) {
+    browser.isWebkit = true;
+  }
+  // IE11 has a new token so we will assign it ie to avoid breaking changes
+  if (browser.rv || browser.iemobile) {
+    browser.ie = true;
+  }
+  // Edge has a new token since it became webkit based
+  if (browser.edg) {
+    browser.edge = true;
+  }
+  // Opera 15+ are identified as opr
+  if (browser.opr) {
+    browser.opera = true;
+  }
+
+  return browser;
+}
+
+export function getComponentPathWithoutIndicies(path = '') {
+  return path.replace(/\[\d+\]/, '');
+}
+
+/**
+ * Returns a path to the component which based on its schema
+ * @param {*} component is a component's schema containing link to its parent's schema in the 'parent' property
+ */
+export function getComponentPath(component, path = '') {
+  if (!component || !component.key || component?._form?.display === 'wizard') { // unlike the Webform, the Wizard has the key and it is a duplicate of the panel key
+    return path;
+  }
+  path = component.isInputComponent || component.input === true ? `${component.key}${path ? '.' : ''}${path}` : path;
+  return getComponentPath(component.parent, path);
+}
+
+/**
+ * Returns a parent component of the passed component instance skipping all the Layout components
+ * @param {*} componentInstance
+ * @return {(Component|undefined)}
+ */
+export function getDataParentComponent(componentInstance) {
+  if (!componentInstance) {
+    return;
+  }
+  const { parent } = componentInstance;
+  if (parent && (parent.isInputComponent || parent.input)) {
+    return parent;
+  }
+  else {
+    return getDataParentComponent(parent);
+  }
+}
+
+/**
+ * Returns whether the value is a promise
+ * @param value
+ * @return {boolean}
+ */
+ export function isPromise(value) {
+   return value
+     && value.then
+     && typeof value.then === 'function'
+     && Object.prototype.toString.call(value) === '[object Promise]';
+ }
+
+/**
+ * Determines if the component has a scoping parent in tree (a component which scopes its children and manages its
+ * changes by itself, e.g. EditGrid)
+ * @param componentInstance
+ * @param firstPass
+ * @returns {boolean|boolean|*}
+ */
+export function isInsideScopingComponent(componentInstance, firstPass = true) {
+  if (!firstPass && componentInstance?.hasScopedChildren) {
+    return true;
+  }
+  const dataParent = getDataParentComponent(componentInstance);
+  if (dataParent?.hasScopedChildren) {
+    return true;
+  }
+  else if (dataParent?.parent) {
+    return isInsideScopingComponent(dataParent.parent, false);
+  }
+  return false;
+}
+
+export function getFocusableElements(element) {
+  const focusableSelector =
+    `button:not([disabled]), input:not([disabled]), select:not([disabled]),
+    textarea:not([disabled]), button:not([disabled]), [href]`;
+  return element.querySelectorAll(focusableSelector);
+}
+
+// Export lodash to save space with other libraries.
+export { _ };

@@ -1,10 +1,13 @@
-import BaseComponent from '../base/Base';
-import Choices from 'choices.js/assets/scripts/dist/choices.js';
-import _ from 'lodash';
+import Input from '../_classes/input/Input';
 
-export default class TagsComponent extends BaseComponent {
+let Choices;
+if (typeof window !== 'undefined') {
+  Choices = require('@formio/choices.js');
+}
+
+export default class TagsComponent extends Input {
   static schema(...extend) {
-    return BaseComponent.schema({
+    return Input.schema({
       type: 'tags',
       label: 'Tags',
       key: 'tags',
@@ -17,67 +20,123 @@ export default class TagsComponent extends BaseComponent {
   static get builderInfo() {
     return {
       title: 'Tags',
-      icon: 'fa fa-tags',
+      icon: 'tags',
       group: 'advanced',
-      documentation: 'http://help.form.io/userguide/#tags',
-      weight: 50,
+      documentation: '/userguide/#tags',
+      weight: 30,
       schema: TagsComponent.schema()
     };
   }
 
-  constructor(component, options, data) {
-    super(component, options, data);
-    this.component.delimeter = this.component.delimeter || ',';
+  init() {
+    super.init();
+  }
+
+  get emptyValue() {
+    return (this.component.storeas === 'string') ? '' : [];
   }
 
   get defaultSchema() {
     return TagsComponent.schema();
   }
 
-  elementInfo() {
-    const info = super.elementInfo();
+  get inputInfo() {
+    const info = super.inputInfo;
     info.type = 'input';
     info.attr.type = 'text';
     info.changeEvent = 'change';
     return info;
   }
 
-  addInput(input, container) {
-    super.addInput(input, container);
-    if (!input) {
+  get delimiter() {
+    return this.component.delimeter || ',';
+  }
+
+  attachElement(element, index) {
+    super.attachElement(element, index);
+    if (!element) {
       return;
     }
-    input.setAttribute('dir', this.i18next.dir());
-    this.choices = new Choices(input, {
-      delimiter: (this.component.delimeter || ','),
+    element.setAttribute('dir', this.i18next.dir());
+    if (this.choices) {
+      this.choices.destroy();
+    }
+
+    if (!Choices) {
+      return;
+    }
+
+    const hasPlaceholder = !!this.component.placeholder;
+
+    this.choices = new Choices(element, {
+      delimiter: this.delimiter,
       editItems: true,
       maxItemCount: this.component.maxTags,
       removeItemButton: true,
+      duplicateItemsAllowed: false,
+      shadowRoot: this.root ? this.root.shadowRoot : null,
+      placeholder: hasPlaceholder,
+      placeholderValue: hasPlaceholder ? this.t(this.component.placeholder, { _userInput: true }) : null,
     });
-    this.choices.itemList.tabIndex = input.tabIndex;
-  }
+    this.choices.itemList.element.tabIndex = element.tabIndex;
+    this.addEventListener(this.choices.input.element, 'blur', () => {
+      const value = this.choices.input.value;
+      const maxTagsNumber = this.component.maxTags;
+      const valuesCount = this.choices.getValue(true).length;
+      const isRepeatedValue = this.choices.getValue(true).some(existingValue => existingValue.trim() === value.trim());
 
-  setValue(value) {
-    if (this.choices) {
-      if (this.component.storeas === 'string' && (typeof value === 'string')) {
-        value = value.split(',');
-      }
-      if (value && !_.isArray(value)) {
-        value = [value];
-      }
-      this.choices.removeActiveItems();
       if (value) {
-        this.choices.setValue(value);
+        if (maxTagsNumber && valuesCount === maxTagsNumber) {
+          this.choices.addItems = false;
+          this.choices.clearInput();
+        }
+        else if (isRepeatedValue) {
+          this.choices.clearInput();
+        }
+        else {
+          this.choices.setValue([value]);
+          this.choices.clearInput();
+          this.choices.hideDropdown(true);
+          this.updateValue(null, {
+            modified: true
+          });
+        }
       }
+    });
+  }
+
+  detach() {
+    super.detach();
+    if (this.choices) {
+      this.choices.destroy();
+      this.choices = null;
     }
   }
 
-  getValue() {
-    if (this.choices) {
-      const value = this.choices.getValue(true);
-      return (this.component.storeas === 'string') ? value.join(this.component.delimeter) : value;
+  normalizeValue(value) {
+    if (this.component.storeas === 'string' && Array.isArray(value)) {
+      return value.join(this.delimiter);
     }
-    return null;
+    else if (this.component.storeas === 'array' && typeof value === 'string') {
+      return value.split(this.delimiter).filter(result => result);
+    }
+    return value;
+  }
+
+  setValue(value, flags = {}) {
+    const changed = super.setValue(value, flags);
+    if (this.choices) {
+      let dataValue = this.dataValue;
+      this.choices.removeActiveItems();
+      if (dataValue) {
+        if (typeof dataValue === 'string') {
+          dataValue = dataValue.split(this.delimiter).filter(result => result);
+        }
+        const value = Array.isArray(dataValue) ? dataValue : [dataValue];
+        this.choices.setValue(value.map((val) => this.sanitize(val, this.shouldSanitizeValue)));
+      }
+    }
+    return changed;
   }
 
   set disabled(disabled) {
@@ -93,12 +152,26 @@ export default class TagsComponent extends BaseComponent {
     }
   }
 
-  destroy() {
-    super.destroy();
-    if (this.choices) {
-      this.choices.destroyed = true;
-      this.choices.destroy();
-      this.choices = null;
+  get disabled() {
+    return super.disabled;
+  }
+
+  focus() {
+    if (this.refs.input && this.refs.input.length) {
+      this.refs.input[0].parentNode.lastChild.focus();
     }
+  }
+
+  getValueAsString(value) {
+    if (!value) {
+      return '';
+    }
+
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+
+    const stringValue = value.toString();
+    return this.sanitize(stringValue, this.shouldSanitizeValue);
   }
 }

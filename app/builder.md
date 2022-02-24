@@ -56,7 +56,7 @@ lib: builder
       </div>
     </div>
     <div class="row">
-      <div class="col-md-4"><a href="https://github.com/formio/formio" target="_blank"><img class="img-responsive" src="https://form.io/assets/images/github-logo.png"></a></div>
+      <div class="col-md-4"><a href="https://github.com/formio/formio" target="_blank"><img style="width: 100%" class="img-responsive" src="https://github.githubassets.com/images/modules/logos_page/Octocat.png"></a></div>
       <div class="col-md-8">
         <p>Getting started is as easy as...</p>
         <pre style="background-color: white;">git clone https://github.com/formio/formio.git
@@ -91,17 +91,21 @@ var onForm = function(form) {
   });
 };
 
+var onBuild = function(build) {
+  jsonElement.innerHTML = '';
+  formElement.innerHTML = '';
+  jsonElement.appendChild(document.createTextNode(JSON.stringify(builder.instance.schema, null, 4)));
+  Formio.createForm(formElement, builder.instance.form).then(onForm);
+};
+
+var onReady = function() {
+  var jsonElement = document.getElementById('json');
+  var formElement = document.getElementById('formio');
+  builder.instance.on('change', onBuild);
+};
+
 var setDisplay = function(display) {
-  builder.setDisplay(display).then(function(instance) {     
-     instance.on('change', function(form) {
-       if (form.components) {
-          formElement.innerHTML = '';
-          jsonElement.innerHTML = '';
-          jsonElement.appendChild(document.createTextNode(JSON.stringify(form, null, 4)));
-          Formio.createForm(formElement, form).then(onForm);
-       }
-     });
-   });
+  builder.setDisplay(display).then(onReady);
 };
 
 // Handle the form selection.
@@ -110,5 +114,5 @@ formSelect.addEventListener("change", function() {
   setDisplay(this.value);
 });
 
-setDisplay('form');
+builder.instance.ready.then(onReady);
 </script>

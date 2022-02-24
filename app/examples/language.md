@@ -4,16 +4,16 @@ layout: vtabs
 section: examples
 weight: 301
 ---
-With Form.io, you can provide multiple langauges for the forms that are rendered within your application. This
+With Form.io, you can provide multiple languages for the forms that are rendered within your application. This
 is done like the following.
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/formiojs@latest/dist/formio.full.min.css">
-<script src="https://unpkg.com/formiojs@latest/dist/formio.full.min.js"></script>
+<link rel="stylesheet" href="https://cdn.form.io/formiojs/formio.full.min.css">
+<script src="https://cdn.form.io/formiojs/formio.full.min.js"></script>
 <div class="btn-group">
-  <button type="button" class="btn btn-default" onclick="setLanguage('sp')">Español</button>
-  <button type="button" class="btn btn-default" onclick="setLanguage('en')">English</button>
-  <button type="button" class="btn btn-default" onclick="setLanguage('ch')">中文</button>
+  <button type="button" class="btn btn-primary" onclick="setLanguage('sp')">Español</button>
+  <button type="button" class="btn btn-primary" onclick="setLanguage('en')">English</button>
+  <button type="button" class="btn btn-primary" onclick="setLanguage('ch')">中文</button>
 </div>
 <div id="formio"></div>
 ```
@@ -95,7 +95,8 @@ Formio.createForm(document.getElementById('formio'), {
       Good: 'Bueno',
       Average: 'Promedio',
       Poor: 'Pobre',
-      'Submit': 'Enviar'
+      'Submit': 'Enviar',
+      complete: 'Presentación Completa',
     },
     ch: {
       'First Name': '名字',
@@ -111,7 +112,8 @@ Formio.createForm(document.getElementById('formio'), {
       Good: '好',
       Average: '平均',
       Poor: '错',
-      'Submit': '提交'
+      'Submit': '提交',
+      complete: '提交完成',
     }
   }
 }).then(function(form) {
@@ -126,9 +128,9 @@ Formio.createForm(document.getElementById('formio'), {
 <h3 class="mt-0">Result</h3>
 <div class="card card-body bg-light">
 <div class="btn-group">
-  <button type="button" class="btn btn-default" onclick="setLanguage('sp')">Español</button>
-  <button type="button" class="btn btn-default" onclick="setLanguage('en')">English</button>
-  <button type="button" class="btn btn-default" onclick="setLanguage('ch')">中文</button>
+  <button type="button" class="btn btn-primary mr-1" onclick="setLanguage('sp')">Español</button>
+  <button type="button" class="btn btn-primary mr-1" onclick="setLanguage('en')">English</button>
+  <button type="button" class="btn btn-primary" onclick="setLanguage('ch')">中文</button>
 </div>
 <div id="formio" style="margin-top: 20px;"></div>
 <script type="text/javascript">
@@ -208,7 +210,8 @@ Formio.createForm(document.getElementById('formio'), {
       Good: 'Bueno',
       Average: 'Promedio',
       Poor: 'Pobre',
-      'Submit': 'Enviar'
+      'Submit': 'Enviar',
+      complete: 'Presentación Completa',
     },
     ch: {
       'First Name': '名字',
@@ -224,7 +227,8 @@ Formio.createForm(document.getElementById('formio'), {
       Good: '好',
       Average: '平均',
       Poor: '错',
-      'Submit': '提交'
+      'Submit': '提交',
+      complete: '提交完成',
     }
   }
 }).then(function(form) {

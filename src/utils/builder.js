@@ -9,12 +9,16 @@ export default {
    * @param {Object} component
    *   The component to uniquify
    */
-  uniquify(form, component) {
+  uniquify(container, component) {
     let changed = false;
     const formKeys = {};
-    eachComponent(form.components, function(comp) {
+    eachComponent(container, (comp) => {
       formKeys[comp.key] = true;
-    });
+
+      if (['address', 'container', 'datagrid', 'editgrid', 'dynamicWizard', 'tree'].includes(comp.type) || comp.tree || comp.arrayTree) {
+        return true;
+      }
+    }, true);
 
     // Recurse into all child components.
     eachComponent([component], (component) => {
@@ -27,6 +31,12 @@ export default {
       if (newKey !== component.key) {
         component.key = newKey;
         changed = true;
+      }
+
+      formKeys[newKey] = true;
+
+      if (['address', 'container', 'datagrid', 'editgrid', 'dynamicWizard', 'tree'].includes(component.type) || component.tree || component.arrayTree) {
+        return true;
       }
     }, true);
     return changed;
@@ -50,7 +60,7 @@ export default {
   getBindedShortcuts(components, input) {
     const result = [];
 
-    eachComponent(components, function(component) {
+    eachComponent(components, (component) => {
       if (component === input) {
         return;
       }
@@ -76,7 +86,10 @@ export default {
     }
     return [''].concat(_.difference(
       this.getAlphaShortcuts().concat(this.getAdditionalShortcuts(component.type)),
-      this.getBindedShortcuts(form.components, component))
-    );
+      this.getBindedShortcuts(form.components, component)),
+    ).map((shortcut) => ({
+      label: shortcut,
+      value: shortcut,
+    }));
   }
 };
